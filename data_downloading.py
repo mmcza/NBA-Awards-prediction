@@ -1,5 +1,6 @@
 from nba_api.stats.endpoints import PlayerDashboardByYearOverYear, CommonAllPlayers
 import pandas as pd
+import os
 
 # set pandas options
 pd.set_option('display.max_columns', None)
@@ -22,7 +23,7 @@ for idx, (index, player_row) in enumerate(all_players_df.iterrows(), 1):
     player_name = player_row['DISPLAY_FIRST_LAST']
 
     # Create an instance of the PlayerDashboardByYearOverYear endpoint
-    player_dashboard = PlayerDashboardByYearOverYear(player_id=str(player_id), per_mode_detailed='PerGame')
+    player_dashboard = PlayerDashboardByYearOverYear(player_id=str(player_id), per_mode_detailed='Totals')
 
     # Retrieve the data
     player_dashboard_data = player_dashboard.get_data_frames()[1]
@@ -41,7 +42,7 @@ for idx, (index, player_row) in enumerate(all_players_df.iterrows(), 1):
 all_player_stats_df = pd.concat(all_player_stats, ignore_index=True)
 
 # Save the data to a CSV file
-all_player_stats_df.to_csv('nba_players_seasonal_stats_per_game.csv', index=False)
+all_player_stats_df.to_csv(os.path.join("data", "nba_players_seasonal_stats.csv"), index=False)
 
 # Display the data
 print(all_player_stats_df)
