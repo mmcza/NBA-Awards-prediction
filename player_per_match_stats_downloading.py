@@ -38,6 +38,9 @@ while start_date.year <= 1996:
             # Get the data frame with player stats for the current game
             player_stats = boxscore.player_stats.get_data_frame()
 
+            # Add the date of the game to the DataFrame
+            player_stats['GAME_DATE'] = date.strftime('%Y-%m-%d')
+
             # Append player stats dataframe to the list
             all_player_stats.append(player_stats)
 
@@ -48,7 +51,7 @@ while start_date.year <= 1996:
     full_player_stats_df = pd.concat(all_player_stats, ignore_index=True)
 
     # Determine the file path
-    file_path = os.path.join("data", "player_per_match_stats.csv")
+    file_path = os.path.join("data", "all_matches_stats.csv")
 
     # Check if the file already exists
     if os.path.exists(file_path):
