@@ -11,8 +11,6 @@ all_players_df = all_players.get_data_frames()[0]
 # Create an empty list to store all player awards DataFrames
 all_player_awards = []
 
-idx = 0
-
 # Iterate through each player
 for _, player_row in all_players_df.iterrows():
     player_id = player_row['PERSON_ID']
@@ -32,11 +30,6 @@ for _, player_row in all_players_df.iterrows():
 
     # Append player awards to the all_player_awards list
     all_player_awards.append(player_awards_data)
-
-    idx += 1
-
-    if idx == 10:
-        break
 
 # Concatenate all player awards DataFrames into a single DataFrame
 all_player_awards_df = pd.concat(all_player_awards, ignore_index=True)
