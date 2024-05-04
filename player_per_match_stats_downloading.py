@@ -11,14 +11,14 @@ pd.set_option('display.max_columns', None)
 # start_date = datetime.datetime(1947, 10, 1)
 # end_date = datetime.datetime(1948, 9, 30)
 
-start_date = datetime.datetime(1994, 10, 1)
-end_date = datetime.datetime(1995, 9, 30)
+start_date = datetime.datetime(2001, 10, 1)
+end_date = datetime.datetime(2002, 9, 30)
 
 # start timer
 start_time = time.time()
 
 # Loop until start_date reaches 1996
-while start_date.year <= 1996:
+while start_date.year <= 2002:
     # Initialize an empty list to store player stats dataframes
     all_player_stats = []
     print("Currently processing data for the year:", start_date.year)
