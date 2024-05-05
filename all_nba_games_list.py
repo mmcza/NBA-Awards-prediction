@@ -1,50 +1,58 @@
+from nba_api.stats.endpoints import boxscoretraditionalv2
 import pandas as pd
-from nba_api.stats.endpoints import ScoreboardV2, BoxScoreTraditionalV2
-import datetime
 import os
-import time
 
-# set pandas options
+# Set pandas options
 pd.set_option('display.max_columns', None)
 
-# Define the initial start and end dates
-start_date = datetime.datetime(1947, 10, 1)
-end_date = datetime.datetime(1948, 9, 30)
+def calculate_seasonal_stats():
+    # Load the data
+    matches = pd.read_csv("data/matches_46_96.csv")
 
-# Function to save game information to CSV file
-def save_game_info(game_info):
-    file_path = os.path.join("data", "list_of_all_nba_games.csv")
-    if os.path.exists(file_path):
-        game_info.to_csv(file_path, mode='a', header=False, index=False)
-    else:
-        game_info.to_csv(file_path, index=False)
+    match_ids = matches['GAME_ID'].unique()
 
-# Loop until start_date reaches selected season
-while start_date.year <= 2022:
-    # Initialize an empty DataFrame to store game information
-    game_info_df = pd.DataFrame()
+    all_matches = pd.DataFrame()
 
-    # Iterate over each day of the season
-    date = start_date
-    while date <= end_date:
-        print("Currently looking for games @", date)
-        # Get the scoreboard for the current date
-        scoreboard = ScoreboardV2(game_date=date)
+    for index, match_id in enumerate(match_ids):
+        if len(str(match_id)) < 10:
+            match_id_string = "0"*(10-len(str(match_id))) + str(match_id)
+        else:
+            match_id_string = str(match_id)
 
-        # Get the game IDs for all games played on the current date
-        game_ids = scoreboard.game_header.get_data_frame()
+        match_result = get_game_result(match_id_string)
+        all_matches = pd.concat([all_matches, match_result], ignore_index=True)
 
-        # Append game information to DataFrame
-        game_info_df = pd.concat([game_info_df, game_ids])
+        print(f"Processed {index+1} out of {len(match_ids)} matches")
 
-        # Move to the next date
-        date += datetime.timedelta(days=1)
+        if index % 100 == 0:
+            file_path = os.path.join("data", "all_matches_list.csv")
+            # Check if the file already exists
+            if os.path.exists(file_path):
+                # If the file exists, read the existing data and append the new data
+                existing_data = pd.read_csv(file_path)
+                combined_data = pd.concat([existing_data, all_matches], ignore_index=True)
+                combined_data.to_csv(file_path, index=False)
+            else:
+                # If the file doesn't exist, save the data directly
+                all_matches.to_csv(file_path, index=False)
 
-    # Check if the current date is the end of the season (30th September)
-    save_game_info(game_info_df)
+            all_matches = pd.DataFrame()
 
-    # Increment the start_date and end_date by one year
-    start_date = start_date.replace(year=start_date.year + 1)
-    end_date = end_date.replace(year=end_date.year + 1)
 
-print("All seasons processed and game information saved.")
+    # Save DataFrame to CSV file
+    file_path = os.path.join("data", "all_matches_list.csv")
+    existing_data = pd.read_csv(file_path)
+    combined_data = pd.concat([existing_data, all_matches], ignore_index=True)
+    combined_data.to_csv(file_path, index=False)
+
+def get_game_result(game_id):
+    # Retrieve box score data for the specified game ID
+    boxscore = boxscoretraditionalv2.BoxScoreTraditionalV2(game_id=game_id)
+    boxscore_data = boxscore.get_data_frames()
+
+    # Extract team-level statistics
+    team_totals = boxscore_data[1]
+    return team_totals
+
+if __name__ == "__main__":
+    calculate_seasonal_stats()
