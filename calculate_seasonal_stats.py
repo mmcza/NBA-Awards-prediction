@@ -64,12 +64,12 @@ def calculate_seasonal_stats():
 
 
     # Calculate the seasonal stats
-    seasonal_stats = matches.groupby(['SEASON', 'MATCH_TYPE', 'PLAYER_NAME', 'PLAYER_ID'])[['PTS', 'REB', 'AST', 'STL', 'BLK', 'TO', 'FGM', 'FGA', 'FG3M', 'FG3A', 'FTM', 'FTA']].sum().reset_index()
+    seasonal_stats = matches.groupby(['SEASON', 'MATCH_TYPE', 'PLAYER_NAME', 'PLAYER_ID'])[['PTS', 'REB', 'AST', 'STL', 'BLK', 'TO', 'FGM', 'FGA', 'FG3M', 'FG3A', 'FTM', 'FTA', 'FGM_2', 'FG3M_2', 'FTM_2']].sum().reset_index()
 
     # Calculate the percentages
-    seasonal_stats['FG_PCT'] = seasonal_stats['FGM'] / seasonal_stats['FGA']
-    seasonal_stats['FG3_PCT'] = seasonal_stats['FG3M'] / seasonal_stats['FG3A']
-    seasonal_stats['FT_PCT'] = seasonal_stats['FTM'] / seasonal_stats['FTA']
+    seasonal_stats['FG_PCT'] = seasonal_stats['FGM_2'] / seasonal_stats['FGA']
+    seasonal_stats['FG3_PCT'] = seasonal_stats['FG3M_2'] / seasonal_stats['FG3A']
+    seasonal_stats['FT_PCT'] = seasonal_stats['FTM_2'] / seasonal_stats['FTA']
 
     # Save the data
     seasonal_stats.to_csv("data/seasonal_stats_46_96.csv", index=False)
