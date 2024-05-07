@@ -73,18 +73,35 @@ def calculate_score_given_player_stats():
     all_matches['FTM_2'] = all_matches.apply(calculate_not_empty, axis=1, args=['FTA', 'FTM'])
 
 
-    results = all_matches.groupby(['GAME_ID', 'TEAM_ID'])[['PTS', 'REB', 'AST', 'STL', 'BLK', 'TO', 'FGM', 'FGA',
+    results = all_matches.groupby(['GAME_ID', 'TEAM_ID', 'TEAM_ABBREVIATION'])[['PTS', 'REB', 'AST', 'STL', 'BLK', 'TO', 'FGM', 'FGA',
                                                            'FG3M', 'FG3A', 'FTM', 'FTA', 'MIN', 'PF', 'FGM_2', 'FG3M_2', 'FTM_2',
                                                            'OREB', 'DREB']].sum()
     results['FG_PCT'] = results['FGM_2'] / results['FGA']
     results['FG3_PCT'] = results['FG3M_2'] / results['FG3A']
     results['FT_PCT'] = results['FTM_2'] / results['FTA']
 
+    results['GAME_DATE'] = all_matches.groupby(['GAME_ID', 'TEAM_ID'])['GAME_DATE'].first()
+
+    seasons = pd.read_csv("data/NBA_Seasons_Dates.csv")
+    # Get the season for each match and what kind of match was it
+    for index, row in seasons.iterrows():
+        if row['Season'] == '1946-47':
+            results.loc[results['GAME_DATE'] <= row['Finals_end'], 'SEASON'] = row['Season']
+        else:
+            previous_final = seasons.loc[index - 1, 'Finals_end']
+            results.loc[(results['GAME_DATE'] > previous_final) & (results['GAME_DATE'] <= row['Finals_end']), 'SEASON'] = row['Season']
+
+        results.loc[(results['GAME_DATE'] >= row['Regular_season_start']) & (results['GAME_DATE'] <= row['Regular_season_end']), 'MATCH_TYPE'] = "Regular"
+        results.loc[(results['GAME_DATE'] >= row['Playoffs_start']) & (results['GAME_DATE'] <= row['Playoffs_end']), 'MATCH_TYPE'] = "Playoffs"
+        results.loc[(results['GAME_DATE'] >= row['Finals_start']) & (results['GAME_DATE'] <= row['Finals_end']), 'MATCH_TYPE'] = "Finals"
+        if not pd.isna(row['Playin_start']):
+            results.loc[(results['GAME_DATE'] >= row['Playin_start']) & (results['GAME_DATE'] <= row['Playin_end']), 'MATCH_TYPE'] = "Play-In"
+
     results = results.drop(columns=['FGM_2', 'FG3M_2', 'FTM_2'])
 
     results = results.reset_index()
 
-    results.to_csv("data/match_results.csv", index=False)
+    results.to_csv("data/matches_team_results.csv", index=False)
 
 def compare():
     # Load the data
