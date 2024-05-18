@@ -1,42 +1,5 @@
 import pandas as pd
 
-def prepare_matches_46_96():
-    # Load the data
-    all_matches_stats = pd.read_csv("data/all_matches_stats_46_96.csv")
-    seasons = pd.read_csv("data/NBA_Seasons_Dates.csv")
-
-    # Converting columns to datetime
-    date_columns = ['Regular_season_start', 'Regular_season_end', 'Playin_start', 'Playin_end',
-                    'Playoffs_start', 'Playoffs_end', 'Finals_start', 'Finals_end']
-    seasons[date_columns] = seasons[date_columns].apply(lambda x: pd.to_datetime(x, errors='coerce'))
-
-    # Remove the matches from 1996-97 season because they were available on the NBA website
-    season_96_97 = seasons.loc[seasons['Season'] == '1995-96', 'Finals_end']
-    all_matches_stats['GAME_DATE'] = pd.to_datetime(all_matches_stats['GAME_DATE'])
-    all_matches_stats = all_matches_stats[all_matches_stats['GAME_DATE'] <= season_96_97.values[0]]
-
-    # Drop unnecessary columns and add the season and match type columns
-    all_matches_stats.drop(columns=['NICKNAME', 'COMMENT', 'PLUS_MINUS', 'START_POSITION'], inplace=True)
-    all_matches_stats['SEASON'] = None
-    all_matches_stats['MATCH_TYPE'] = None
-
-    # Get the season for each match and what kind of match was it
-    for index, row in seasons.iterrows():
-        if row['Season'] == '1946-47':
-            all_matches_stats.loc[all_matches_stats['GAME_DATE'] <= row['Finals_end'], 'SEASON'] = row['Season']
-        else:
-            previous_final = seasons.loc[index - 1, 'Finals_end']
-            all_matches_stats.loc[(all_matches_stats['GAME_DATE'] > previous_final) and (all_matches_stats['GAME_DATE'] <= row['Finals_end']), 'SEASON'] = row['Season']
-
-        all_matches_stats.loc[(all_matches_stats['GAME_DATE'] >= row['Regular_season_start']) and (all_matches_stats['GAME_DATE'] <= row['Regular_season_end']), 'MATCH_TYPE'] = "Regular"
-        all_matches_stats.loc[(all_matches_stats['GAME_DATE'] >= row['Playoffs_start']) and (all_matches_stats['GAME_DATE'] <= row['Playoffs_end']), 'MATCH_TYPE'] = "Playoffs"
-        all_matches_stats.loc[(all_matches_stats['GAME_DATE'] >= row['Finals_start']) and (all_matches_stats['GAME_DATE'] <= row['Finals_end']), 'MATCH_TYPE'] = "Finals"
-        if not pd.isna(row['Playin_start']):
-            all_matches_stats.loc[(all_matches_stats['GAME_DATE'] >= row['Playin_start']) and (all_matches_stats['GAME_DATE'] <= row['Playin_end']), 'MATCH_TYPE'] = "Play-In"
-
-    # Save the data
-    all_matches_stats.to_csv("data/matches_46_96.csv", index=False)
-
 def time_to_float(time_str):
     if ':' in str(time_str):
         minutes, seconds = time_str.split(':')
@@ -76,11 +39,14 @@ def prepare_matches():
         if not pd.isna(row['Playin_start']):
             all_matches_stats.loc[(all_matches_stats['GAME_DATE'] >= row['Playin_start']) & (all_matches_stats['GAME_DATE'] <= row['Playin_end']), 'MATCH_TYPE'] = "Play-In"
 
+    # Add information about All-Star games
+    all_matches_stats.loc[(all_matches_stats['TEAM_CITY'] == 'East NBA All Stars') | (all_matches_stats['TEAM_CITY'] == 'West NBA All Stars'), 'MATCH_TYPE'] = "All-Star"
+
     # Save the data
     all_matches_stats.to_csv("data/matches_player_stats.csv", index=False)
 
 def calculate_not_empty(row, column_to_check, column_to_return):
-    if pd.notna(row[column_to_check]):  # Check if FGA is not empty
+    if pd.notna(row[column_to_check]):
         return row[column_to_return]
     else:
         return None
@@ -135,20 +101,26 @@ def calculate_seasonal_stats():
     winner_team = team_results.loc[team_results.groupby('GAME_ID')['PTS'].idxmax()]
     winner_team = winner_team[['GAME_ID', 'TEAM_ID']]
 
+    # Calculate additional statistics
+    # Count statistics only if number of attemps is not empty
     matches['FGM_2'] = matches.apply(calculate_not_empty, axis=1, args=['FGA', 'FGM'])
     matches['FG3M_2'] = matches.apply(calculate_not_empty, axis=1, args=['FG3A', 'FG3M'])
     matches['FTM_2'] = matches.apply(calculate_not_empty, axis=1, args=['FTA', 'FTM'])
+
+    # Count how many statistics were in double digits and calculate if it was a Double-Double or Triple-Double
     matches['Stats_over_10'] = matches.apply(calculate_over_10, axis=1)
     matches['DD'] = matches['Stats_over_10'].apply(lambda x: 1 if x >= 2 else 0)
     matches['TD'] = matches['Stats_over_10'].apply(lambda x: 1 if x >= 3 else 0)
+
+    # Calculate the fantasy points, PIE and if player played in the match
     matches['FP'] = matches.apply(calculate_fantasy_points, axis=1)
     matches['GP'] = matches['MIN'].notna().astype(int)
     matches['PIE'] =matches.apply(calculate_pie, axis=1)
 
     # Calculate if team won the match
     matches = matches.merge(winner_team, on='GAME_ID', how='left', suffixes=('', '_WINNER'))
-    matches['W'] = (matches['TEAM_ID'] == matches['TEAM_ID_WINNER']).astype(int)
-    matches['L'] = (matches['TEAM_ID'] != matches['TEAM_ID_WINNER']).astype(int)
+    matches['W'] = (matches['TEAM_ID'] == matches['TEAM_ID_WINNER']).astype(int) * matches['GP']
+    matches['L'] = (matches['TEAM_ID'] != matches['TEAM_ID_WINNER']).astype(int) * matches['GP']
     matches = matches.drop(columns=['TEAM_ID_WINNER'])
 
     # Calculate the seasonal stats
@@ -165,6 +137,72 @@ def calculate_seasonal_stats():
     # Save the data
     seasonal_stats.to_csv("data/seasonal_stats.csv", index=False)
 
+def add_information_about_awards():
+    seasonal_stats = pd.read_csv("data/seasonal_stats.csv")
+    awards = pd.read_csv("data/nba_player_awards.csv")
+
+    # Drop rows with awards that were given only for limited time or are not related to a season
+    awards = awards[~awards['SUBTYPE1'].isin(['Hall of Fame', 'Sporting News', 'Olympic', 'IBM', 'All-Star'])]
+
+    # Add columns to the seasonal_stats dataframe
+    seasonal_stats['MVP'] = 0
+    seasonal_stats['ROY'] = 0
+    seasonal_stats['DPOY'] = 0
+    seasonal_stats['MIP'] = 0
+    seasonal_stats['6MOY'] = 0
+    seasonal_stats['All-NBA-Team'] = 0
+    seasonal_stats['All-Defensive-Team'] = 0
+    seasonal_stats['All-Rookie-Team'] = 0
+    seasonal_stats['All-Star'] = 0
+    seasonal_stats['All-Star-MVP'] = 0
+    seasonal_stats['Finals-MVP'] = 0
+    seasonal_stats['POTW'] = 0
+    seasonal_stats['POTM'] = 0
+    seasonal_stats['ROTM'] = 0
+
+    #print(awards['DESCRIPTION'].unique())
+
+    for index, row in awards.iterrows():
+        if row['DESCRIPTION'] == 'All-NBA':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'All-NBA-Team'] = row['ALL_NBA_TEAM_NUMBER']
+        if row['DESCRIPTION'] == 'NBA All-Star Most Valuable Player':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'All-Star-MVP'] = 1
+        if row['DESCRIPTION'] == 'All-Rookie Team':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'All-Rookie-Team'] = row['ALL_NBA_TEAM_NUMBER']
+        if row['DESCRIPTION'] == 'NBA Most Valuable Player':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'MVP'] = 1
+        if row['DESCRIPTION'] == 'NBA Rookie of the Year':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'ROY'] = 1
+        if row['DESCRIPTION'] == 'All-Defensive Team':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'All-Defensive-Team'] = row['ALL_NBA_TEAM_NUMBER']
+        if row['DESCRIPTION'] == 'NBA Rookie of the Month':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'ROTM'] += 1
+        if row['DESCRIPTION'] == 'NBA Player of the Month':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'POTM'] += 1
+        if row['DESCRIPTION'] == 'NBA Player of the Week':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'POTW'] += 1
+        if row['DESCRIPTION'] == 'NBA Defensive Player of the Year':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'DPOY'] = 1
+        if row['DESCRIPTION'] == 'NBA Most Improved Player':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'MIP'] = 1
+        if row['DESCRIPTION'] == 'NBA Sixth Man of the Year':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            '6MOY'] = 1
+
+    seasonal_stats.to_csv("data/seasonal_stats_with_awards.csv", index=False)
+
 if __name__ == "__main__":
     #prepare_matches()
     calculate_seasonal_stats()
+    add_information_about_awards()
