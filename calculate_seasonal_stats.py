@@ -41,6 +41,12 @@ def prepare_matches():
 
     # Add information about All-Star games
     all_matches_stats.loc[(all_matches_stats['TEAM_CITY'] == 'East NBA All Stars') | (all_matches_stats['TEAM_CITY'] == 'West NBA All Stars'), 'MATCH_TYPE'] = "All-Star"
+    all_matches_stats.loc[(all_matches_stats['TEAM_ABBREVIATION'] == 'LBN') | (
+                all_matches_stats['TEAM_ABBREVIATION'] == 'STP') | (
+                all_matches_stats['TEAM_ABBREVIATION'] == 'GNS') | (
+                all_matches_stats['TEAM_ABBREVIATION'] == 'DRT'), 'MATCH_TYPE'] = "All-Star"
+    # Add information about final of the In-Season Tournament
+    all_matches_stats.loc[(all_matches_stats['GAME_ID'] == 62300001), 'MATCH_TYPE'] = "In-Season Tournament Final"
 
     # Save the data
     all_matches_stats.to_csv("data/matches_player_stats.csv", index=False)
@@ -200,9 +206,16 @@ def add_information_about_awards():
             seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
             '6MOY'] = 1
 
+    # Go through the All-Star games and write information who took part in them
+
+    for index, row in seasonal_stats.iterrows():
+        if row['MATCH_TYPE'] == 'All-Star':
+            seasonal_stats.loc[(seasonal_stats['SEASON'] == row['SEASON']) & (seasonal_stats['PLAYER_ID'] == row['PLAYER_ID']),
+            'All-Star'] = 1
+
     seasonal_stats.to_csv("data/seasonal_stats_with_awards.csv", index=False)
 
 if __name__ == "__main__":
     #prepare_matches()
-    calculate_seasonal_stats()
+    #calculate_seasonal_stats()
     add_information_about_awards()
