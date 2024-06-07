@@ -11,7 +11,7 @@ pd.set_option('display.max_columns', None)
 # start_date = datetime.datetime(1947, 10, 1)
 # end_date = datetime.datetime(1948, 9, 30)
 
-start_date = datetime.datetime(2023, 10, 1)
+start_date = datetime.datetime(1948, 10, 1)
 end_date = datetime.datetime(2024, 5, 4)
 
 # start timer

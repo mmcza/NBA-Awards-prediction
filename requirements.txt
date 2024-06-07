@@ -1,3 +1,6 @@
 nba_api
+scikit-learn
 pandas
 matplotlib
+seaborn
+numpy
