@@ -21,7 +21,10 @@
   * [4. Metric](#4-metric)
   * [5. Models](#5-models)
     * [5.1. All-NBA teams prediction](#51-all-nba-teams-prediction)
-      * [5.1.1. Baseline model (score: 143.5)](#511-baseline-model-score-1435)
+      * [5.1.1. Baseline model (score: 148.25)](#511-baseline-model-score-14825)
+    * [5.1.2. Random Forest Classifier with only per game statistics (score: 141.5)](#512-random-forest-classifier-with-only-per-game-statistics-score-1415)
+    * [5.1.3. Random Forest Classifier with prediction voting (score: 154.5)](#513-random-forest-classifier-with-prediction-voting-score-1545)
+    * [5.1.4. Comparison of different default models (Logistic Regression, Support Vector Machine, Decision Tree, Random Forest, K-Nearest Neighbors, XGBOOST, LightGBM, Voting Classifier)](#514-comparison-of-different-default-models-logistic-regression-support-vector-machine-decision-tree-random-forest-k-nearest-neighbors-xgboost-lightgbm-voting-classifier)
 <!-- TOC -->
 
 ## Requirements
@@ -197,8 +200,32 @@ After removing the statistics that weren't calculated as mean per game, the scor
 
 The model was predicting the probability of player being selected to each of the All-NBA teams and than the predictions were used to calculate voting points from the formula:
 
-$`Points`=5 \cdot P_{1st Team} + 3 \cdot P_{2nd Team} + 1 \cdot P_{3rd Team}$.
+$VotPts=5 \cdot P_{1st Team} + 3 \cdot P_{2nd Team} + 1 \cdot P_{3rd Team}$.
 
 The formula is based on the formula to [calculate results of real All-NBA Team voting](https://x.com/NBAPR/status/1793430330113654910/photo/1). After calculating the points, top players were added to each team. The score of the model was 154.5.
 
 Only the mean per game statistics were used as the score was higher than for the model with all statistics.
+
+### 5.1.4. Comparison of different default models (Logistic Regression, Support Vector Machine, Decision Tree, Random Forest, K-Nearest Neighbors, XGBOOST, LightGBM, Voting Classifier)
+
+The comparison of the models is shown in the table below:
+
+| Model                  | Only per game<br/> stats + Voting | No per game<br/> stats + Voting | All stats<br/> + Voting | Only per game<br/> stats + No Voting | No per game<br/>stats + No Voting | All stats<br/> + No Voting |
+|------------------------|-----------------------------------|---------------------------------|--------------------|--------------------------------------|-----------------------------------|-----------------------|
+| Logistic Regression    | 121.75                            | 109.25                          | 109.25             | 116.00                               | 109.25                            | 111.75                |
+| Support Vector Machine | 113.25                            | 124.25                          | 124.25             | 118.50                               | 122.75                            | 122.75                |
+| Decision Tree          | 120.50                            | 102.75                          | 110.00             | 117.00                               | 86.75                             | 87.75                 |
+| Random Forest          | **154.50**                        | **158.75**                      | **145.75**         | **142.00**                           | **149.25**                        | **148.25**            |
+| K-Nearest Neighbors    | 106.50                            | 105.25                          | 105.25             | 95.00                                | 104.25                            | 104.25                |
+| XGBOOST                | 141.00                            | 143.00                          | 143.25             | 131.75                               | 131.00                            | 138.50                |
+| LightGBM               | 135.50                            | 147.75                          | 137.50             | 137.25                               | 140.50                            | 137.50                |
+| Voting Classifier*     | 133.75                            | 145.00                          | 136.50             | 139.25                               | 139.50                            | 136.25                |
+
+*Voting Classifier was built from all the above models.
+
+With **bold** are marked the best scores for each configuration.
+
+The best score was achieved by Random Forest Classifier (158.75). Scores above 140 points were achieved also by:
+- XGBOOST - in 3 configurations,
+- LightGBM - in 2 configurations,
+- Voting Classifier - in 1 configuration.
