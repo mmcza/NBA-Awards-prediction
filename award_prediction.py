@@ -302,8 +302,8 @@ def all_nba_training():
                               'FTM_per_GP', 'AST_per_GP', 'REB_per_GP', 'TO_per_GP', 'STL_per_GP', 'BLK_per_GP',
                               'MIN_per_GP', 'FG3A_per_GP', 'FG3M_per_GP']
     X_train = X_train.drop(columns_to_drop, axis=1)
-    #X_train = X_train.drop(not_per_game_stats_to_drop, axis=1)
-    X_train = X_train.drop(per_game_stats_to_drop, axis=1)
+    # X_train = X_train.drop(not_per_game_stats_to_drop, axis=1)
+    # X_train = X_train.drop(per_game_stats_to_drop, axis=1)
 
     # Create validation set
     validation_set = {}
@@ -344,6 +344,8 @@ def all_nba_training():
             models = define_models(randomized_params, voting_weights)
             # Train the models
             for model_name, model in models.items():
+                if model_name == 'LGB':
+                    continue
                 model.fit(X_train[columns_to_use], y_train)
                 score = calculate_score(model, validation_set, columns_to_use)
                 new_row = pd.DataFrame({'model_name': [model_name],
