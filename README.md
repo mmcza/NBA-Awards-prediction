@@ -149,7 +149,7 @@ Based on the correlation matrix, the highest importance for the selection to All
 - `Points`,
 - `Free Throws Made`,
 - `Field Goals Made`.
-- 
+
 High correlation between those above statistics and being selected to All-NBA teams is understandable as those statistics (apart from Free Throws made) directly show impact on the game. Free Throws Made may be correlated because good players usually play more and create more actions so the possiblity of being fouled is higher.
 
 The least correlated statistics are:
@@ -157,7 +157,7 @@ The least correlated statistics are:
 - `3PT Field Goals Percentage`,
 - `3 PT Field Goals Made`.
 
-The low correlation between 3PT Shot statistics is probably caused by the fact that the Centers and Power Forwards usually don't shoot 3PT shots.
+The low correlation between 3PT Shot statistics is probably caused by the fact that the Centers and Power Forwards usually don't shoot 3PT shots. And in the past those kind of players also weren't good in Free Throws what explains the low correlation with Free Throw Percentage.
 
 ## 3. Splitting the data for training and validation sets
 
@@ -192,11 +192,11 @@ The baseline model was a Random Forest Classifier with `n_estimators = 100` that
 
 The baseline model got a high score so it's a good starting point, but also makes it harder to find early improvements.
 
-### 5.1.2. Random Forest Classifier with only per game statistics (score: 141.5)
+#### 5.1.2. Random Forest Classifier with only per game statistics (score: 141.5)
 
 After removing the statistics that weren't calculated as mean per game, the score of the model decreased to 141.5.
 
-### 5.1.3. Random Forest Classifier with prediction voting (score: 154.5)
+#### 5.1.3. Random Forest Classifier with prediction voting (score: 154.5)
 
 The model was predicting the probability of player being selected to each of the All-NBA teams and than the predictions were used to calculate voting points from the formula:
 
@@ -206,7 +206,7 @@ The formula is based on the formula to [calculate results of real All-NBA Team v
 
 Only the mean per game statistics were used as the score was higher than for the model with all statistics.
 
-### 5.1.4. Comparison of different default models (Logistic Regression, Support Vector Machine, Decision Tree, Random Forest, K-Nearest Neighbors, XGBOOST, LightGBM, Voting Classifier)
+#### 5.1.4. Comparison of different default models (Logistic Regression, Support Vector Machine, Decision Tree, Random Forest, K-Nearest Neighbors, XGBOOST, LightGBM, Voting Classifier)
 
 The comparison of the models is shown in the table below:
 
@@ -229,3 +229,20 @@ The best score was achieved by Random Forest Classifier (158.75). Scores above 1
 - XGBOOST - in 3 configurations,
 - LightGBM - in 2 configurations,
 - Voting Classifier - in 1 configuration.
+
+#### 5.1.5. Hyperparameter tuning and feature selection
+Only the 4 models that achieved 140 points at least once were selected for hyperparameter tuning.
+
+The following parameter grid was created (Voting Classifier was built only from other models in this table):
+
+|            | Random Forest Classifier | XGBoost | LightGBM | Voting Classifier                                                                                                                      |
+|------------|----------------------|---------|----------|----------------------------------------------------------------------------------------------------------------------------------------|
+| Parameters | ```{'n_estimators': [100, 200, 300, 400, 500],```<br/> ```'max_depth': [10, 25, 50, 100, None],```<br/> ```'min_samples_split': [2, 5, 10],```<br/> ```'min_samples_leaf': [1, 2, 4],```<br/>```'max_features': ['sqrt', 'log2']}```  | ```{'n_estimators': [100, 200, 300, 400, 500],```<br/> ```'max_depth': [10, 25, 50, 100, None],```<br/> ```'learning_rate': [0.01, 0.05, 0.1, 0.2],```<br/> ```'subsample': [0.6, 0.8, 1],```<br/> ```'colsample_bytree': [0.5, 0.8, 1],```<br/> ```'gamma': [0, 0.1, 0.2, 0.3, 0.4]}``` | ```{'n_estimators': [100, 200, 300, 400, 500],```<br/> ```'max_depth': [10, 25, 50, 100, None],```<br/> ```'learning_rate': [0.01, 0.05, 0.1, 0.2],```<br/> ```'subsample': [0.6, 0.8, 1],```<br/> ```'colsample_bytree': [0.5, 0.8, 1],```<br/> ```'gamma': [0, 0.1, 0.2, 0.3, 0.4]}``` | ```{'weights': [[1, 1, 1], [1, 2, 1], [1, 1, 2], [2, 1, 1], [2, 2, 1], [1, 2, 2]]```<br/> ```'voting': 'soft'}``` |
+
+Also the feature selection was implemented. In each iteration there were randomly chosen a random number of features (at least 5) from the list of statistics and for each set of features there were 100 iterations of hyperparameter tuning. 
+
+By randomly chosing the features 100 times and then randomly choosing parameters 100 times, there was a total of 10000 results for each model (40000 in total). The best results for each model are shown in the table below:
+
+3 best sets of features (mean value for all models):
+
+### 5.2. Rookie All-NBA teams prediction

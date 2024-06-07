@@ -10,7 +10,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
 import xgboost as xgb
 import lightgbm as lgb
-
+import pickle
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
@@ -56,6 +56,7 @@ def award_metrics(prediction, real_values, rookie=False):
 
     return points
 
+# Function to sum up points for prediction of each player
 def award_voting(prediction):
     points = np.ones_like(prediction)
     for i in range(len(prediction)):
@@ -63,7 +64,7 @@ def award_voting(prediction):
 
     return points
 
-
+# Function to convert the prediction to a dictionary
 def prediction_to_dict(prediction, names, mvp, rookie=False, voting=False):
     if rookie:
         prediction_dict = {"first rookie all-nba team": [],
@@ -102,7 +103,80 @@ def prediction_to_dict(prediction, names, mvp, rookie=False, voting=False):
 
     return prediction_dict
 
+# Function to calculate the score of the model
+def calculate_score(model, validation_set, columns):
+    score = 0
+    for season in validation_set:
+        prediction = prediction_to_dict(model.predict_proba(validation_set[season]['data'][columns]), validation_set[season]['names'],
+                                         validation_set[season]['mvp'], voting=True)
+        real_nba_teams = validation_set[season]['real_nba_teams']
+        score += award_metrics(prediction, real_nba_teams)
+    return score/4
 
+# Function to randomly select parameters for the models
+def randomize_parameters():
+
+    # Create parameter grid for the models
+    param_grid = {'RFC': {'n_estimators': [100, 200, 300, 400, 500],
+                          'max_depth': [10, 25, 50, 100, None],
+                          'min_samples_split': [2, 5, 10],
+                          'min_samples_leaf': [1, 2, 4],
+                          'max_features': ['sqrt', 'log2']},
+                    'XGB': {'n_estimators': [100, 200, 300, 400, 500],
+                            'max_depth': [10, 25, 50, 100, None],
+                            'learning_rate': [0.01, 0.05, 0.1, 0.2],
+                            'subsample': [0.6, 0.8, 1],
+                            'colsample_bytree': [0.5, 0.8, 1],
+                            'gamma': [0, 0.1, 0.2, 0.3, 0.4]},
+                  'LGB': {'n_estimators': [100, 200, 300, 400, 500],
+                             'max_depth': [10, 25, 50, 100, None],
+                            'learning_rate': [0.01, 0.05, 0.1, 0.2],
+                            'subsample': [0.6, 0.8, 1],
+                            'colsample_bytree': [0.5, 0.8, 1]},
+                  'Voting': {'weights_nr': [0, 1, 2, 3, 4, 5]}
+                    }
+
+    # Randomly select parameters
+    randomized_params = {}
+    for model_name, params in param_grid.items():
+        randomized_params[model_name] = {}
+        for param, values in params.items():
+            randomized_params[model_name][param] = np.random.choice(values)
+    return randomized_params
+
+# Function to define the models
+def define_models(randomized_params, voting_weights):
+    # Random Forest Classifier
+    RFC = RandomForestClassifier(n_estimators=randomized_params['RFC']['n_estimators'],
+                                 max_depth=randomized_params['RFC']['max_depth'],
+                                 min_samples_split=randomized_params['RFC']['min_samples_split'],
+                                 min_samples_leaf=randomized_params['RFC']['min_samples_leaf'],
+                                 max_features=randomized_params['RFC']['max_features'],
+                                 random_state=42)
+    # XGBoost Classifier
+    XGB = xgb.XGBClassifier(n_estimators=randomized_params['XGB']['n_estimators'],
+                            max_depth=randomized_params['XGB']['max_depth'],
+                            learning_rate=randomized_params['XGB']['learning_rate'],
+                            subsample=randomized_params['XGB']['subsample'],
+                            colsample_bytree=randomized_params['XGB']['colsample_bytree'],
+                            random_state=42)
+    # LightGBM Classifier
+    LGB = lgb.LGBMClassifier(n_estimators=randomized_params['LGB']['n_estimators'],
+                             max_depth=randomized_params['LGB']['max_depth'],
+                             learning_rate=randomized_params['LGB']['learning_rate'],
+                             subsample=randomized_params['LGB']['subsample'],
+                             colsample_bytree=randomized_params['LGB']['colsample_bytree'],
+                             n_jobs=-1,
+                             random_state=42)
+    # Voting Classifier
+    models_for_voting = [('RFC', RFC), ('XGB', XGB), ('LGB', LGB)]
+    voting = VotingClassifier(models_for_voting, voting='soft',
+                              weights=voting_weights[randomized_params['Voting']['weights_nr']])
+
+    # Create dictionary with models
+    models = {'RFC': RFC, 'XGB': XGB, 'LGB': LGB, 'Voting': voting}
+
+    return models
 
 def all_nba_training():
     # Load the data
@@ -228,101 +302,154 @@ def all_nba_training():
                               'FTM_per_GP', 'AST_per_GP', 'REB_per_GP', 'TO_per_GP', 'STL_per_GP', 'BLK_per_GP',
                               'MIN_per_GP', 'FG3A_per_GP', 'FG3M_per_GP']
     X_train = X_train.drop(columns_to_drop, axis=1)
-    # X_train = X_train.drop(not_per_game_stats_to_drop, axis=1)
+    #X_train = X_train.drop(not_per_game_stats_to_drop, axis=1)
     X_train = X_train.drop(per_game_stats_to_drop, axis=1)
 
-    # Create models
-    # Logistic Regression
-    LR_model = LogisticRegression(random_state=42)
-    # Support Vector Machine
-    SVM_model = SVC(probability=True, random_state=42)
-    # Decision Tree
-    DT_model = DecisionTreeClassifier(random_state=42)
-    # Random Forest Classifier
-    RFC_model = RandomForestClassifier(n_estimators=100, random_state=42)
-    # K-Nearest Neighbors
-    KNN_model = KNeighborsClassifier()
-    # XGBoost
-    XGB_model = xgb.XGBClassifier(random_state=42)
-    # LightGBM
-    LGB_model = lgb.LGBMClassifier(random_state=42)
-    # Voting Classifier
-    Voting_model = VotingClassifier(estimators=[('lr', LR_model), ('svm', SVM_model), ('dt', DT_model), ('rfc', RFC_model),
-                                                ('xgb', XGB_model), ('knn', KNN_model), ('lgb', LGB_model)], voting='soft')
+    # Create validation set
+    validation_set = {}
+    for season in val_seasons:
+        validation_set[season] = {}
+        season_data = X_val.loc[X_val['SEASON_START'] == season]
+        # Save the names of the players
+        validation_set[season]['names'] = season_data['PLAYER_NAME'].to_numpy()
+        # Save the real All-NBA teams and MVP
+        validation_set[season]['real_nba_teams'] = {"first all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 1].values,
+                                                    "second all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 2].values,
+                                                    "third all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 3].values}
+        validation_set[season]['mvp'] = season_data['PLAYER_NAME'][season_data['MVP'] == 1].values[0]
+        # Drop unnecessary columns and save the data
+        season_data = season_data.drop(columns_to_drop, axis=1)
+        validation_set[season]['data'] = season_data
 
-    # Create a dictionary of models
-    models = {'LR': LR_model, 'SVM': SVM_model, 'DT': DT_model, 'RFC': RFC_model, 'KNN': KNN_model,
-              'XGB': XGB_model, 'LGB': LGB_model, 'Voting': Voting_model}
-    scores = {}
+    # Create a dataframe to store the scores of the models
+    model_scores = pd.DataFrame(columns=['model_name', 'param', 'used_statistics', 'score'])
 
-    # Train the models
-    for model_name, model in models.items():
-        model.fit(X_train, y_train)
-        print(f'{model_name} trained')
-        score = 0
-        for season in val_seasons:
-            season_data = X_val.loc[X_val['SEASON_START'] == season]
-            names = season_data['PLAYER_NAME'].to_numpy()
-            real_nba_teams = {"first all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 1].values,
-                              "second all-nba team": season_data['PLAYER_NAME'][
-                                  season_data['All-NBA-Team'] == 2].values,
-                              "third all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 3].values}
-            mvp = season_data['PLAYER_NAME'][season_data['MVP'] == 1].values[0]
-            season_data = season_data.drop(columns_to_drop, axis=1)
-            # season_data = season_data.drop(not_per_game_stats_to_drop, axis=1)
-            season_data = season_data.drop(per_game_stats_to_drop, axis=1)
-            prediction = prediction_to_dict(model.predict_proba(season_data), names, mvp, voting=False)
-            print(f'Season: {season}')
-            print(prediction)
-            print(real_nba_teams)
-            print(award_metrics(prediction, real_nba_teams))
-            score += award_metrics(prediction, real_nba_teams)
-        scores[model_name] = score/4
+    # Define the voting weights
+    voting_weights = [[1, 1, 1], [1, 2, 1], [1, 1, 2],
+                    [2, 1, 1], [2, 2, 1], [1, 2, 2]]
+    # Get available columns
+    columns = X_train.columns
 
-    print(scores)
-    # RFC_model.fit(X_train, y_train)
-    #
-    # # Predict the All-NBA teams for the validation seasons
-    # score = 0
-    # for season in val_seasons:
-    #     season_data = X_val.loc[X_val['SEASON_START'] == season]
-    #     names = season_data['PLAYER_NAME'].to_numpy()
-    #     real_nba_teams = {"first all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 1].values,
-    #                       "second all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 2].values,
-    #                       "third all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 3].values}
-    #     mvp = season_data['PLAYER_NAME'][season_data['MVP'] == 1].values[0]
-    #     season_data = season_data.drop(columns_to_drop, axis=1)
-    #     season_data = season_data.drop(not_per_game_stats_to_drop, axis=1)
-    #     prediction = prediction_to_dict(RFC_model.predict_proba(season_data), names, mvp, voting=True)
-    #     print(f'Season: {season}')
-    #     print(prediction)
-    #     print(real_nba_teams)
-    #     print(award_metrics(prediction, real_nba_teams))
-    #     score += award_metrics(prediction, real_nba_teams)
-    #
-    # print(f'Total score: {score}')
-    # print(f'Average score: {score / 4}')
-    #
-    # # Calculate the feature importances
-    # feature_importances = RFC_model.feature_importances_
-    # features = X_train.columns
-    # importance_df = pd.DataFrame({'feature': features, 'importance': feature_importances})
-    # importance_df = importance_df.sort_values('importance', ascending=False)
-    # # Plot the feature importances
-    # plt.figure(figsize=(10, 6))
-    # sns.barplot(x='importance', y='feature', data=importance_df)
-    # plt.title('Feature Importances')
-    # plt.show()
-    #
+    # Create a loop to test different configuarations of the models and data
+    for i in range(100):
+        # Randomly select columns to use
+        columns_to_use = np.random.choice(columns, size=np.random.randint(5, len(columns)), replace=False)
+
+        # Create a loop to test different models with different parameters
+        for j in range(100):
+            print(f'Iteration: {i}/{j}')
+            # Randomize the parameters
+            randomized_params = randomize_parameters()
+            # Define the models
+            models = define_models(randomized_params, voting_weights)
+            # Train the models
+            for model_name, model in models.items():
+                model.fit(X_train[columns_to_use], y_train)
+                score = calculate_score(model, validation_set, columns_to_use)
+                new_row = pd.DataFrame({'model_name': [model_name],
+                                        'param': [randomized_params[model_name]],
+                                        'used_statistics': [columns_to_use],
+                                        'score': [score]})
+                model_scores = pd.concat([model_scores, new_row], ignore_index=True)
+        # Save the statistics of the models as a csv file
+        model_scores.to_csv('./models/model_scores.csv')
+
+    # Select the best model
+    best_model = model_scores.loc[model_scores['score'].idxmax()]
+    print(best_model)
+    # Create the best predictor
+    if best_model['model_name'] == 'Voting':
+        best_predictor = VotingClassifier([('RFC', RandomForestClassifier(n_estimators=best_model['param']['RFC']['n_estimators'],
+                                        max_depth=best_model['param']['RFC']['max_depth'],
+                                        min_samples_split=best_model['param']['RFC']['min_samples_split'],
+                                        min_samples_leaf=best_model['param']['RFC']['min_samples_leaf'],
+                                        max_features=best_model['param']['RFC']['max_features'],
+                                        random_state=42)),
+                                          ('XGB', xgb.XGBClassifier(n_estimators=best_model['param']['XGB']['n_estimators'],
+                                        max_depth=best_model['param']['XGB']['max_depth'],
+                                        learning_rate=best_model['param']['XGB']['learning_rate'],
+                                        subsample=best_model['param']['XGB']['subsample'],
+                                        colsample_bytree=best_model['param']['XGB']['colsample_bytree'],
+                                        random_state=42)),
+                                          ('LGB', lgb.LGBMClassifier(n_estimators=best_model['param']['LGB']['n_estimators'],
+                                        max_depth=best_model['param']['LGB']['max_depth'],
+                                        learning_rate=best_model['param']['LGB']['learning_rate'],
+                                        subsample=best_model['param']['LGB']['subsample'],
+                                        colsample_bytree=best_model['param']['LGB']['colsample_bytree'],
+                                        random_state=42))],
+                                        voting='soft',
+                                        weights=voting_weights[best_model['param']['Voting']['weights_nr']])
+    elif best_model['model_name'] == 'RFC':
+        best_predictor = RandomForestClassifier(n_estimators=best_model['param']['n_estimators'],
+                                        max_depth=best_model['param']['max_depth'],
+                                        min_samples_split=best_model['param']['min_samples_split'],
+                                        min_samples_leaf=best_model['param']['min_samples_leaf'],
+                                        max_features=best_model['param']['max_features'],
+                                        random_state=42)
+    elif best_model['model_name'] == 'XGB':
+        best_predictor = xgb.XGBClassifier(n_estimators=best_model['param']['n_estimators'],
+                                        max_depth=best_model['param']['max_depth'],
+                                        learning_rate=best_model['param']['learning_rate'],
+                                        subsample=best_model['param']['subsample'],
+                                        colsample_bytree=best_model['param']['colsample_bytree'],
+                                        random_state=42)
+    elif best_model['model_name'] == 'LGB':
+        best_predictor = lgb.LGBMClassifier(n_estimators=best_model['param']['n_estimators'],
+                                        max_depth=best_model['param']['max_depth'],
+                                        learning_rate=best_model['param']['learning_rate'],
+                                        subsample=best_model['param']['subsample'],
+                                        colsample_bytree=best_model['param']['colsample_bytree'],
+                                        random_state=42)
+
+    # Train the best model
+    best_predictor.fit(X_train[best_model['used_statistics']], y_train)
+
+    # Save the model
+    with open('./models/all_nba_pred_model.pkl', 'wb') as f:
+        pickle.dump(best_predictor, f)
+
     # Predict the All-NBA teams for the 2023-24 season
     names_2324 = normalized_season2324['PLAYER_NAME'].to_numpy()
     mvp_2324 = normalized_season2324['PLAYER_NAME'][normalized_season2324['MVP'] == 1].values[0]
-    normalized_season2324 = normalized_season2324.drop(columns_to_drop, axis=1)
-    #normalized_season2324 = normalized_season2324.drop(not_per_game_stats_to_drop, axis=1)
-    normalized_season2324 = normalized_season2324.drop(per_game_stats_to_drop, axis=1)
-    predictions_2324 = prediction_to_dict(models['RFC'].predict_proba(normalized_season2324), names_2324, mvp_2324, voting=True)
+    predictions_2324 = prediction_to_dict(best_predictor.predict_proba(normalized_season2324[best_model['used_statistics']]), names_2324, mvp_2324, voting=True)
     print("Prediction for 2023/24")
     print(predictions_2324)
+
+    # # Train the models
+    # for model_name, model in models.items():
+    #     model.fit(X_train, y_train)
+    #     print(f'{model_name} trained')
+    #     score = 0
+    #     for season in val_seasons:
+    #         season_data = X_val.loc[X_val['SEASON_START'] == season]
+    #         names = season_data['PLAYER_NAME'].to_numpy()
+    #         real_nba_teams = {"first all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 1].values,
+    #                           "second all-nba team": season_data['PLAYER_NAME'][
+    #                               season_data['All-NBA-Team'] == 2].values,
+    #                           "third all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 3].values}
+    #         mvp = season_data['PLAYER_NAME'][season_data['MVP'] == 1].values[0]
+    #         season_data = season_data.drop(columns_to_drop, axis=1)
+    #         #season_data = season_data.drop(not_per_game_stats_to_drop, axis=1)
+    #         season_data = season_data.drop(per_game_stats_to_drop, axis=1)
+    #         prediction = prediction_to_dict(model.predict_proba(season_data), names, mvp, voting=True)
+    #         print(f'Season: {season}')
+    #         print(prediction)
+    #         print(real_nba_teams)
+    #         print(award_metrics(prediction, real_nba_teams))
+    #         score += award_metrics(prediction, real_nba_teams)
+    #     scores[model_name] = score/4
+    #
+    # print(scores)
+    #
+    # # Predict the All-NBA teams for the 2023-24 season
+    # names_2324 = normalized_season2324['PLAYER_NAME'].to_numpy()
+    # mvp_2324 = normalized_season2324['PLAYER_NAME'][normalized_season2324['MVP'] == 1].values[0]
+    # normalized_season2324 = normalized_season2324.drop(columns_to_drop, axis=1)
+    # # normalized_season2324 = normalized_season2324.drop(not_per_game_stats_to_drop, axis=1)
+    # normalized_season2324 = normalized_season2324.drop(per_game_stats_to_drop, axis=1)
+    # predictions_2324 = prediction_to_dict(models['RFC'].predict_proba(normalized_season2324), names_2324, mvp_2324, voting=True)
+    # print("Prediction for 2023/24")
+    # print(predictions_2324)
 
 if __name__ == '__main__':
     all_nba_training()
