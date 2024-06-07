@@ -12,7 +12,16 @@
     * [2.1. Seasons and types of matches](#21-seasons-and-types-of-matches)
     * [2.2. Player statistics](#22-player-statistics)
     * [2.3. Awards](#23-awards)
+      * [2.3.1. Awards and All-NBA teams](#231-awards-and-all-nba-teams)
     * [2.4. Average statistics and normalization](#24-average-statistics-and-normalization)
+    * [2.4.1. Eliminating players with low statistics for All-NBA teams prediction](#241-eliminating-players-with-low-statistics-for-all-nba-teams-prediction)
+    * [2.4.2. Eliminating players with low statistics for Rookie All-NBA teams prediction](#242-eliminating-players-with-low-statistics-for-rookie-all-nba-teams-prediction)
+    * [2.4.3. Statistics correlation for All-NBA teams prediction](#243-statistics-correlation-for-all-nba-teams-prediction)
+  * [3. Splitting the data for training and validation sets](#3-splitting-the-data-for-training-and-validation-sets)
+  * [4. Metric](#4-metric)
+  * [5. Models](#5-models)
+    * [5.1. All-NBA teams prediction](#51-all-nba-teams-prediction)
+      * [5.1.1. Baseline model (score: 143.5)](#511-baseline-model-score-1435)
 <!-- TOC -->
 
 ## Requirements
@@ -147,7 +156,11 @@ The least correlated statistics are:
 
 The low correlation between 3PT Shot statistics is probably caused by the fact that the Centers and Power Forwards usually don't shoot 3PT shots.
 
-## 3. Metric
+## 3. Splitting the data for training and validation sets
+
+The data was split into training and validation sets and each season is fully in either training or validation set. 4 validation seasons were randomly selected and the score for validation set was calculated as mean value of the metric for each of the 4 seasons.
+
+## 4. Metric
 
 The following metric was used to evaluate the model (proposed by the course lecturer):
  - `+10 points` for each player in correct team,
@@ -161,3 +174,31 @@ The following metric was used to evaluate the model (proposed by the course lect
 That means that the maximum number of points for a season is $5 \cdot (5 \cdot 10 + 40) = 450$.
 
 Using metrics like accuracy would be misleading because the number of players not selected to any of the All-NBA teams is much higher than those who got selected. An example could be to classify every of the 146 players eligible to be selected to All-NBA teams in 2023-24 season as not selected and the accuracy would be 0.89.  
+
+## 5. Models
+
+### 5.1. All-NBA teams prediction
+
+Below are some of the models that were used to predict the players selected to All-NBA teams.
+
+#### 5.1.1. Baseline model (score: 148.25)
+
+The baseline model was a Random Forest Classifier with `n_estimators = 100` that was predicting probability of player being selected to each of the All-NBA teams. The mean score on validation set was 148.25 out of 270 points. The feature importance for the model is shown below:
+
+![Feature importance for baseline model](/media/3_All_NBA_baseline_feature_importance.png)
+
+The baseline model got a high score so it's a good starting point, but also makes it harder to find early improvements.
+
+### 5.1.2. Random Forest Classifier with only per game statistics (score: 141.5)
+
+After removing the statistics that weren't calculated as mean per game, the score of the model decreased to 141.5.
+
+### 5.1.3. Random Forest Classifier with prediction voting (score: 154.5)
+
+The model was predicting the probability of player being selected to each of the All-NBA teams and than the predictions were used to calculate voting points from the formula:
+
+$`Points`=5 \cdot P_{1st Team} + 3 \cdot P_{2nd Team} + 1 \cdot P_{3rd Team}$.
+
+The formula is based on the formula to [calculate results of real All-NBA Team voting](https://x.com/NBAPR/status/1793430330113654910/photo/1). After calculating the points, top players were added to each team. The score of the model was 154.5.
+
+Only the mean per game statistics were used as the score was higher than for the model with all statistics.

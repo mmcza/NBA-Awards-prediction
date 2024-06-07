@@ -10,7 +10,7 @@ from sklearn.ensemble import RandomForestClassifier
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 
-# Define the metrics for the awards
+# Define the metrics for the prediction
 def award_metrics(prediction, real_values, rookie=False):
     points = 0
     correct_teams = {1: 0, 2: 0, 3: 0}
@@ -51,7 +51,15 @@ def award_metrics(prediction, real_values, rookie=False):
 
     return points
 
-def prediction_to_dict(prediction, names, mvp, rookie=False):
+def award_voting(prediction):
+    points = np.ones_like(prediction)
+    for i in range(len(prediction)):
+        points[i, :] *= prediction[i, 1]*5 + prediction[i, 2]*3 + prediction[i, 3]*1
+
+    return points
+
+
+def prediction_to_dict(prediction, names, mvp, rookie=False, voting=False):
     if rookie:
         prediction_dict = {"first rookie all-nba team": [],
                            "second rookie all-nba team": []}
@@ -69,8 +77,10 @@ def prediction_to_dict(prediction, names, mvp, rookie=False):
         num_teams = 3
 
     pred_np = np.array(prediction)
+    if voting:
+        pred_np = award_voting(pred_np)
     top_predictions = {}
-    # Get the players with highest possibility for each team
+    # Get the players with highest probability for each team
     for team in range(1, num_teams + 1):
         sorted_indices = np.argsort(pred_np[:, team])[::-1]
         top_indices = sorted_indices[:top_players]
@@ -192,36 +202,32 @@ def all_nba_training():
 
     # Correlation of awards and All-NBA team selection
     awards = ['MVP', 'DPOY', 'ROY', '6MOY', 'MIP', 'All-Star', 'All-Star-MVP', 'POTW', 'POTM']
-    for award in awards:
-        print(award)
-        print(normalized_seasons['All-NBA-Team'].loc[normalized_seasons[award] > 0].value_counts())
-
-    #print(normalized_seasons.describe())
+    # for award in awards:
+    #     print(award)
+    #     print(normalized_seasons['All-NBA-Team'].loc[normalized_seasons[award] > 0].value_counts())
 
     # Divide the data into training and validation sets
     np.random.seed(42)
     val_seasons = np.random.randint(1988, 2023, 4)
-    #print(f'Validation seasons: {val_seasons}')
     X_train = normalized_seasons.loc[~normalized_seasons['SEASON_START'].isin(val_seasons)]
     X_val = normalized_seasons.loc[normalized_seasons['SEASON_START'].isin(val_seasons)]
-    y_train_any = X_train['ANY_ALL_NBA']
-    y_val_any = X_val['ANY_ALL_NBA']
     y_train = X_train['All-NBA-Team']
-    y_val = X_val['All-NBA-Team']
 
     # Drop unnecessary columns
     columns_to_drop = ['SEASON', 'SEASON_START', 'MATCH_TYPE', 'All-NBA-Team', 'ANY_ALL_NBA', 'PLAYER_NAME',
                         'ANY_ALL_ROOKIE', 'All-Defensive-Team', 'All-Rookie-Team', 'Finals-MVP', 'PLAYER_ID',
-                       'MVP', 'ROY', '6MOY', 'MIP']
-
+                       'MVP', 'ROY', '6MOY', 'MIP', 'ROOKIE_SEASON', 'FTM', 'FGM', 'FG3M']
+    not_per_game_stats_to_drop = ['PIE', 'FP', 'PTS', 'FGM_2', 'FTA', 'FGA', 'FTM_2', 'AST', 'REB',
+                                  'TO', 'STL', 'MIN', 'BLK', 'FG3A', 'FG3M_2', 'ROTM']
     X_train = X_train.drop(columns_to_drop, axis=1)
-    #X_val = X_val.drop(columns_to_drop, axis=1)
-    season2324 = normalized_season2324.drop(columns_to_drop, axis=1)
+    X_train = X_train.drop(not_per_game_stats_to_drop, axis=1)
 
     # Train the Random Forest Classifier model for all All-NBA teams
     RFC_model = RandomForestClassifier(n_estimators=100, random_state=42)
     RFC_model.fit(X_train, y_train)
-    #RFC_predictions = RFC_model.predict_proba(X_val)
+
+    # Predict the All-NBA teams for the validation seasons
+    score = 0
     for season in val_seasons:
         season_data = X_val.loc[X_val['SEASON_START'] == season]
         names = season_data['PLAYER_NAME'].to_numpy()
@@ -230,38 +236,36 @@ def all_nba_training():
                           "third all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 3].values}
         mvp = season_data['PLAYER_NAME'][season_data['MVP'] == 1].values[0]
         season_data = season_data.drop(columns_to_drop, axis=1)
-        prediction = prediction_to_dict(RFC_model.predict_proba(season_data), names, mvp)
+        season_data = season_data.drop(not_per_game_stats_to_drop, axis=1)
+        prediction = prediction_to_dict(RFC_model.predict_proba(season_data), names, mvp, voting=True)
         print(f'Season: {season}')
         print(prediction)
+        print(real_nba_teams)
         print(award_metrics(prediction, real_nba_teams))
+        score += award_metrics(prediction, real_nba_teams)
 
-    # # Train the Random Forest Classifier model for any All-NBA team
-    # RFC_model_any = RandomForestClassifier(n_estimators=100, random_state=42)
-    # RFC_model_any.fit(X_train, y_train_any)
-    # RFC_predictions_any = RFC_model_any.predict(X_val)
-    # RFC_confusion_matrix_any = confusion_matrix(y_val_any, RFC_predictions_any)
-    # RFC_true_positives_any = np.diag(RFC_confusion_matrix_any)
-    # print('Random Forest Classifier Any ', RFC_confusion_matrix_any)
-    # print('Random Forest Classifier Any ', RFC_true_positives_any)
-    #
-    # # Train the Logistic Regression model for all All-NBA teams
-    # LR_model = LogisticRegression(random_state=42)
-    # LR_model.fit(X_train, y_train)
-    # LR_predictions = LR_model.predict(X_val)
-    # LR_confusion_matrix = confusion_matrix(y_val, LR_predictions)
-    # LR_true_positives = np.diag(LR_confusion_matrix)
-    # print('Logistic Regression ', LR_confusion_matrix)
-    # print('Logistic Regression ', LR_true_positives)
-    #
-    # # Train the Logistic Regression model for any All-NBA team
-    # LR_model_any = LogisticRegression(random_state=42)
-    # LR_model_any.fit(X_train, y_train_any)
-    # LR_predictions_any = LR_model_any.predict(X_val)
-    # LR_confusion_matrix_any = confusion_matrix(y_val_any, LR_predictions_any)
-    # print(LR_predictions_any)
-    # LR_true_positives_any = np.diag(LR_confusion_matrix_any)
-    # print('Logistic Regression Any ', LR_confusion_matrix_any)
-    # print('Logistic Regression Any ', LR_true_positives_any)
+    print(f'Total score: {score}')
+    print(f'Average score: {score / 4}')
+
+    # Calculate the feature importances
+    feature_importances = RFC_model.feature_importances_
+    features = X_train.columns
+    importance_df = pd.DataFrame({'feature': features, 'importance': feature_importances})
+    importance_df = importance_df.sort_values('importance', ascending=False)
+    # Plot the feature importances
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='importance', y='feature', data=importance_df)
+    plt.title('Feature Importances')
+    plt.show()
+
+    # Predict the All-NBA teams for the 2023-24 season
+    names_2324 = normalized_season2324['PLAYER_NAME'].to_numpy()
+    mvp_2324 = normalized_season2324['PLAYER_NAME'][normalized_season2324['MVP'] == 1].values[0]
+    normalized_season2324 = normalized_season2324.drop(columns_to_drop, axis=1)
+    normalized_season2324 = normalized_season2324.drop(not_per_game_stats_to_drop, axis=1)
+    predictions_2324 = prediction_to_dict(RFC_model.predict_proba(normalized_season2324), names_2324, mvp_2324, voting=True)
+    print("Prediction for 2023/24")
+    print(predictions_2324)
 
 if __name__ == '__main__':
     all_nba_training()
