@@ -86,6 +86,8 @@ The data about awards was downloaded for each player and information about the f
 - number of Player of the Month awards,
 - number of Rookie of the Month awards.
 
+#### 2.3.1. Awards and All-NBA teams
+
 The correlation between the awards and the selection to All-NBA teams since 1988-89 season was checked and that data is shown in the table below (for POTM, POTW it meant that the player won at least one award during the season):
 
 | Award | 1st All-NBA Team | 2nd All-NBA Team | 3rd All-NBA Team | Not selected |
@@ -106,12 +108,56 @@ The data shows that the MVPs are always selected to 1st All-NBA team, All-Star G
 
 The statistics were averaged for each player to get his average impact on the game per match (by doing so the number of games player played doesn't matter). 
 
-Also because basketball and players were evolving over the years, the statistics were normalized so that the player with highest certain statistic would have 1 and the rest of the players would have proportionally lower values.
+Also because basketball and players were evolving over the years, the statistics were normalized so that the player with highest certain statistic in specific season would have value 1 and the rest of the players would have proportionally lower values.
 
-However this could cause problems with players who played just a few games during a season and had very high statistics in those games. To eliminate the issue, after displaying data for all players who were selected to All-NBA teams, the following filters were applied:
+However this could cause problems with players who played just a few games during a season and had very high statistics in those games.
+
+### 2.4.1. Eliminating players with low statistics for All-NBA teams prediction
+To eliminate the issue, after displaying data for all players who were selected to All-NBA teams (graph below), the following filters were applied:
 - `Games Played` >= 40,
 - `Minutes` played during season >= 1250,
 - `Points` scored during season >= 333,
 - `Fantasy Points` scored during season >= 1250.
 
+![Statistics of players selected to All-NBA teams](/media/1_All_NBA_players_through_years_stats.png)
+
 By doing so, the data for seasons 1988-89 till 2023-23 was reduced from 16711 to 6074 players. For season 2023-24 there was also a requirement for `Games Played` >= 65 and that caused that only 146 were eligible for All-NBA teams.
+
+### 2.4.2. Eliminating players with low statistics for Rookie All-NBA teams prediction
+
+### 2.4.3. Statistics correlation for All-NBA teams prediction
+
+After normalizing the data, the correlation between the normalized statistics and the selection to All-NBA teams was checked. The correlation matrix is shown below:
+
+![Correlation matrix for All-NBA teams prediction](/media/2_All_NBA_players_normalized_stats_correlation.png)
+
+Based on the correlation matrix, the highest importance for the selection to All-NBA teams have the following statistics:
+- `Player Impact Estimate`,
+- `Fantasy Points`,
+- `Points`,
+- `Free Throws Made`,
+- `Field Goals Made`.
+- 
+High correlation between those above statistics and being selected to All-NBA teams is understandable as those statistics (apart from Free Throws made) directly show impact on the game. Free Throws Made may be correlated because good players usually play more and create more actions so the possiblity of being fouled is higher.
+
+The least correlated statistics are:
+- `Free Throw Percentage`,
+- `3PT Field Goals Percentage`,
+- `3 PT Field Goals Made`.
+
+The low correlation between 3PT Shot statistics is probably caused by the fact that the Centers and Power Forwards usually don't shoot 3PT shots.
+
+## 3. Metric
+
+The following metric was used to evaluate the model (proposed by the course lecturer):
+ - `+10 points` for each player in correct team,
+ - `+8 points` for each player that is classified in a team that's number differ by 1 from the correct one,
+ - `+6 points` for each player that is classified in a team that's number differ by 2 from the correct one,
+ - `+5 points` if 2 players are in correct team,
+ - `+10 points` if 3 players are in correct team,
+ - `+20 points` if 4 players are in correct team,
+ - `+40 points` if 5 players are in correct team.
+
+That means that the maximum number of points for a season is $5 \cdot (5 \cdot 10 + 40) = 450$.
+
+Using metrics like accuracy would be misleading because the number of players not selected to any of the All-NBA teams is much higher than those who got selected. An example could be to classify every of the 146 players eligible to be selected to All-NBA teams in 2023-24 season as not selected and the accuracy would be 0.89.  
