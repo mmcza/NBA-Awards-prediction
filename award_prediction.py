@@ -104,11 +104,11 @@ def prediction_to_dict(prediction, names, mvp, rookie=False, voting=False):
     return prediction_dict
 
 # Function to calculate the score of the model
-def calculate_score(model, validation_set, columns):
+def calculate_score(model, validation_set, columns, vote=True):
     score = 0
     for season in validation_set:
         prediction = prediction_to_dict(model.predict_proba(validation_set[season]['data'][columns]), validation_set[season]['names'],
-                                         validation_set[season]['mvp'], voting=True)
+                                         validation_set[season]['mvp'], voting=vote)
         real_nba_teams = validation_set[season]['real_nba_teams']
         score += award_metrics(prediction, real_nba_teams)
     return score/4
@@ -322,7 +322,7 @@ def all_nba_training():
         validation_set[season]['data'] = season_data
 
     # Create a dataframe to store the scores of the models
-    model_scores = pd.DataFrame(columns=['model_name', 'param', 'used_statistics', 'score'])
+    model_scores = pd.DataFrame(columns=['model_name', 'param', 'used_statistics', 'vote', 'score'])
 
     # Define the voting weights
     voting_weights = [[1, 1, 1], [1, 2, 1], [1, 1, 2],
@@ -331,12 +331,12 @@ def all_nba_training():
     columns = X_train.columns
 
     # Create a loop to test different configuarations of the models and data
-    for i in range(100):
+    for i in range(50):
         # Randomly select columns to use
         columns_to_use = np.random.choice(columns, size=np.random.randint(5, len(columns)), replace=False)
 
         # Create a loop to test different models with different parameters
-        for j in range(100):
+        for j in range(50):
             print(f'Iteration: {i}/{j}')
             # Randomize the parameters
             randomized_params = randomize_parameters()
@@ -344,14 +344,20 @@ def all_nba_training():
             models = define_models(randomized_params, voting_weights)
             # Train the models
             for model_name, model in models.items():
-                if model_name == 'LGB':
-                    continue
                 model.fit(X_train[columns_to_use], y_train)
-                score = calculate_score(model, validation_set, columns_to_use)
+                score_vote = calculate_score(model, validation_set, columns_to_use, vote=True)
+                score_no_vote = calculate_score(model, validation_set, columns_to_use, vote=False)
+                if score_vote>score_no_vote:
+                    score = score_vote
+                    vote = True
+                else:
+                    score = score_no_vote
+                    vote = False
                 new_row = pd.DataFrame({'model_name': [model_name],
                                         'param': [randomized_params[model_name]],
                                         'used_statistics': [columns_to_use],
-                                        'score': [score]})
+                                        'score': [score],
+                                        'vote': [vote]})
                 model_scores = pd.concat([model_scores, new_row], ignore_index=True)
         # Save the statistics of the models as a csv file
         model_scores.to_csv('./models/model_scores.csv')
@@ -416,42 +422,6 @@ def all_nba_training():
     predictions_2324 = prediction_to_dict(best_predictor.predict_proba(normalized_season2324[best_model['used_statistics']]), names_2324, mvp_2324, voting=True)
     print("Prediction for 2023/24")
     print(predictions_2324)
-
-    # # Train the models
-    # for model_name, model in models.items():
-    #     model.fit(X_train, y_train)
-    #     print(f'{model_name} trained')
-    #     score = 0
-    #     for season in val_seasons:
-    #         season_data = X_val.loc[X_val['SEASON_START'] == season]
-    #         names = season_data['PLAYER_NAME'].to_numpy()
-    #         real_nba_teams = {"first all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 1].values,
-    #                           "second all-nba team": season_data['PLAYER_NAME'][
-    #                               season_data['All-NBA-Team'] == 2].values,
-    #                           "third all-nba team": season_data['PLAYER_NAME'][season_data['All-NBA-Team'] == 3].values}
-    #         mvp = season_data['PLAYER_NAME'][season_data['MVP'] == 1].values[0]
-    #         season_data = season_data.drop(columns_to_drop, axis=1)
-    #         #season_data = season_data.drop(not_per_game_stats_to_drop, axis=1)
-    #         season_data = season_data.drop(per_game_stats_to_drop, axis=1)
-    #         prediction = prediction_to_dict(model.predict_proba(season_data), names, mvp, voting=True)
-    #         print(f'Season: {season}')
-    #         print(prediction)
-    #         print(real_nba_teams)
-    #         print(award_metrics(prediction, real_nba_teams))
-    #         score += award_metrics(prediction, real_nba_teams)
-    #     scores[model_name] = score/4
-    #
-    # print(scores)
-    #
-    # # Predict the All-NBA teams for the 2023-24 season
-    # names_2324 = normalized_season2324['PLAYER_NAME'].to_numpy()
-    # mvp_2324 = normalized_season2324['PLAYER_NAME'][normalized_season2324['MVP'] == 1].values[0]
-    # normalized_season2324 = normalized_season2324.drop(columns_to_drop, axis=1)
-    # # normalized_season2324 = normalized_season2324.drop(not_per_game_stats_to_drop, axis=1)
-    # normalized_season2324 = normalized_season2324.drop(per_game_stats_to_drop, axis=1)
-    # predictions_2324 = prediction_to_dict(models['RFC'].predict_proba(normalized_season2324), names_2324, mvp_2324, voting=True)
-    # print("Prediction for 2023/24")
-    # print(predictions_2324)
 
 if __name__ == '__main__':
     all_nba_training()

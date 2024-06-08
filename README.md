@@ -22,9 +22,11 @@
   * [5. Models](#5-models)
     * [5.1. All-NBA teams prediction](#51-all-nba-teams-prediction)
       * [5.1.1. Baseline model (score: 148.25)](#511-baseline-model-score-14825)
-    * [5.1.2. Random Forest Classifier with only per game statistics (score: 141.5)](#512-random-forest-classifier-with-only-per-game-statistics-score-1415)
-    * [5.1.3. Random Forest Classifier with prediction voting (score: 154.5)](#513-random-forest-classifier-with-prediction-voting-score-1545)
-    * [5.1.4. Comparison of different default models (Logistic Regression, Support Vector Machine, Decision Tree, Random Forest, K-Nearest Neighbors, XGBOOST, LightGBM, Voting Classifier)](#514-comparison-of-different-default-models-logistic-regression-support-vector-machine-decision-tree-random-forest-k-nearest-neighbors-xgboost-lightgbm-voting-classifier)
+      * [5.1.2. Random Forest Classifier with only per game statistics (score: 141.5)](#512-random-forest-classifier-with-only-per-game-statistics-score-1415)
+      * [5.1.3. Random Forest Classifier with prediction voting (score: 154.5)](#513-random-forest-classifier-with-prediction-voting-score-1545)
+      * [5.1.4. Comparison of different default models (Logistic Regression, Support Vector Machine, Decision Tree, Random Forest, K-Nearest Neighbors, XGBOOST, LightGBM, Voting Classifier)](#514-comparison-of-different-default-models-logistic-regression-support-vector-machine-decision-tree-random-forest-k-nearest-neighbors-xgboost-lightgbm-voting-classifier)
+      * [5.1.5. Hyperparameter tuning and feature selection](#515-hyperparameter-tuning-and-feature-selection)
+    * [5.2. Rookie All-NBA teams prediction](#52-rookie-all-nba-teams-prediction)
 <!-- TOC -->
 
 ## Requirements
@@ -206,7 +208,7 @@ The formula is based on the formula to [calculate results of real All-NBA Team v
 
 Only the mean per game statistics were used as the score was higher than for the model with all statistics.
 
-#### 5.1.4. Comparison of different default models (Logistic Regression, Support Vector Machine, Decision Tree, Random Forest, K-Nearest Neighbors, XGBOOST, LightGBM, Voting Classifier)
+#### 5.1.4. Comparison of different default models - Logistic Regression, Support Vector Machine, Decision Tree, Random Forest, K-Nearest Neighbors, XGBOOST, LightGBM, Voting Classifier (score: 158.75)
 
 The comparison of the models is shown in the table below:
 
@@ -230,7 +232,7 @@ The best score was achieved by Random Forest Classifier (158.75). Scores above 1
 - LightGBM - in 2 configurations,
 - Voting Classifier - in 1 configuration.
 
-#### 5.1.5. Hyperparameter tuning and feature selection
+#### 5.1.5. Hyperparameter tuning and feature selection (score 175.75)
 Only the 4 models that achieved 140 points at least once were selected for hyperparameter tuning.
 
 The following parameter grid was created (Voting Classifier was built only from other models in this table):
@@ -239,10 +241,37 @@ The following parameter grid was created (Voting Classifier was built only from 
 |------------|----------------------|---------|----------|----------------------------------------------------------------------------------------------------------------------------------------|
 | Parameters | ```{'n_estimators': [100, 200, 300, 400, 500],```<br/> ```'max_depth': [10, 25, 50, 100, None],```<br/> ```'min_samples_split': [2, 5, 10],```<br/> ```'min_samples_leaf': [1, 2, 4],```<br/>```'max_features': ['sqrt', 'log2']}```  | ```{'n_estimators': [100, 200, 300, 400, 500],```<br/> ```'max_depth': [10, 25, 50, 100, None],```<br/> ```'learning_rate': [0.01, 0.05, 0.1, 0.2],```<br/> ```'subsample': [0.6, 0.8, 1],```<br/> ```'colsample_bytree': [0.5, 0.8, 1],```<br/> ```'gamma': [0, 0.1, 0.2, 0.3, 0.4]}``` | ```{'n_estimators': [100, 200, 300, 400, 500],```<br/> ```'max_depth': [10, 25, 50, 100, None],```<br/> ```'learning_rate': [0.01, 0.05, 0.1, 0.2],```<br/> ```'subsample': [0.6, 0.8, 1],```<br/> ```'colsample_bytree': [0.5, 0.8, 1]}``` | ```{'weights': [[1, 1, 1], [1, 2, 1], [1, 1, 2], [2, 1, 1], [2, 2, 1], [1, 2, 2]]```<br/> ```'voting': 'soft'}``` |
 
-Also the feature selection was implemented. In each iteration there were randomly chosen a random number of features (at least 5) from the list of statistics and for each set of features there were 100 iterations of hyperparameter tuning. 
+Also the feature selection was implemented. In each iteration there were randomly chosen a random number of features (at least 5) from the list of statistics and for each set of features there were 50 iterations of hyperparameter tuning. 
 
-By randomly chosing the features 100 times and then randomly choosing parameters 100 times, there was a total of 10000 results for each model (40000 in total). The best results for each model are shown in the table below:
+By randomly choosing the features 50 times and then randomly choosing parameters 50 times, there was a total of 2500 results for each model (10000 in total). Also each model was tested with and without additional voting for the prediction so as a result 20000 combinations were checked. The optimization process took ~6 hours. The best model got score 175.75 (what is a significant improvement over the baseline model). Features and hyperparameters for the best model are as follows:
+
+- model: `Random Forest Classifier`,
+- model parameters: `{'n_estimators': 200, 'max_depth': 10, 'min_samples_split': 2, 'min_samples_leaf': 2, 'max_features': 'sqrt'}`,
+- features: `['STL', 'FTM_2', 'STL_per_GP', 'PIE_per_GP', 'FTA', 'FG3M_per_GP', 'POTM', 'All-Star', 'MIN', 'FGM_2', 'FP', 'DD', 'GP', 'FTA_per_GP', 'PTS', 'REB', 'DPOY', 'FT_PCT', 'REB_per_GP', 'All-Star-MVP', 'L', 'TD', 'FG3_PCT', 'BLK_per_GP', 'PTS_per_GP', 'AST', 'PIE', 'W', 'FG3M_2', 'TO_per_GP', 'FGM_per_GP', 'FGA', 'FTM_per_GP', 'ROTM']`,
+- additional voting: `False`.
+
+The best results for each model are shown in the table below:
 
 3 best sets of features (mean value for all models):
 
+#### 5.1.6. How predictions for validation set could be improved
+
+Before 2023/2024 season, each of the All-NBA teams was containing 2 guards, 2 forwards and 1 center (since 2023/24 the voting is positionless). With that in mind the model could be improved by adding information about the position of the player and then filtering the predictions to have correct number of players in each position.
+
 ### 5.2. Rookie All-NBA teams prediction
+
+## 6. Predictions for 2023/2024 season
+
+### 6.1. All-NBA teams
+
+Predictions for the 2023/2024 season are based on the best model from the previous section. The predictions are shown in the table below:
+
+| 1st Team | 2nd Team | 3rd Team |
+|----------|----------|----------|
+| Nikola Jokic | Jalen Brunson | Devin Booker |
+| Luka Doncic | Anthony Davis | Domantas Sabonis |
+| Shai Gilgeous-Alexander | Anthony Edwards | Damian Lillard |
+| Giannis Antetokounmpo | Kevin Durant | Kawhi Leonard |
+| Jayson Tatum | LeBron James | Tyrese Haliburton |
+
+### 6.2. Rookie All-NBA teams
