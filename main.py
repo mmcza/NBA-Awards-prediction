@@ -110,8 +110,6 @@ def main():
     best_predictor_all_nba = features_all_nba.head(1)
     best_predictor_all_rookie = features_all_rookie.head(1)
 
-    print(best_predictor_all_nba)
-
     # Get the used features as a list
     used_statistics_all_nba = best_predictor_all_nba['used_statistics'].values[0]
     used_statistics_all_nba = used_statistics_all_nba.replace(" ", ",")
@@ -139,5 +137,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-

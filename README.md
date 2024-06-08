@@ -41,6 +41,14 @@
   * [8. Possible improvements](#8-possible-improvements)
 <!-- TOC -->
 
+## Running the prediction
+
+To run the prediction for the 2023/2024 season, run the [main.py](main.py) script with path to a file where the data (as JSON) should be save. Example:
+
+```commandline
+python main.py ~/Documents/predictions.json
+```
+
 ## Requirements
 
 The project was written in Python 3.11. The required packages are listed in the [requirements.txt](requirements.txt) file. To install it, run:
