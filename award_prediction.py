@@ -32,9 +32,12 @@ def award_metrics(prediction, real_values, rookie=False):
             if player in real_values[f'{team_names[team]} all-nba team']:
                 points += 10
                 correct_teams[team] += 1
-            if team < 3 and player in real_values[f'{team_names[team + 1]} all-nba team']:
-                points += 8
+            if rookie:
+                if team < 1 and player in real_values[f'{team_names[team + 1]} all-nba team']:
+                    points += 8
             if not rookie:
+                if team < 3 and player in real_values[f'{team_names[team + 1]} all-nba team']:
+                    points += 8
                 if team < 2 and player in real_values[f'{team_names[team + 2]} all-nba team']:
                     points += 6
             if team > 1 and player in real_values[f'{team_names[team - 1]} all-nba team']:
@@ -57,19 +60,23 @@ def award_metrics(prediction, real_values, rookie=False):
     return points
 
 # Function to sum up points for prediction of each player
-def award_voting(prediction):
+def award_voting(prediction, rookie=False):
     points = np.ones_like(prediction)
-    for i in range(len(prediction)):
-        points[i, :] *= prediction[i, 1]*5 + prediction[i, 2]*3 + prediction[i, 3]*1
+    if not rookie:
+        for i in range(len(prediction)):
+            points[i, :] *= prediction[i, 1]*5 + prediction[i, 2]*3 + prediction[i, 3]*1
+    else:
+        for i in range(len(prediction)):
+            points[i, :] *= prediction[i, 1]*2 + prediction[i, 2]*1
 
     return points
 
 # Function to convert the prediction to a dictionary
 def prediction_to_dict(prediction, names, mvp, rookie=False, voting=False):
     if rookie:
-        prediction_dict = {"first rookie all-nba team": [],
+        prediction_dict = {"first rookie all-nba team": [mvp],
                            "second rookie all-nba team": []}
-        players = []
+        players = [mvp]
         team_names = {1: "first rookie", 2: "second rookie"}
         top_players = 10
         num_teams = 2
@@ -84,7 +91,7 @@ def prediction_to_dict(prediction, names, mvp, rookie=False, voting=False):
 
     pred_np = np.array(prediction)
     if voting:
-        pred_np = award_voting(pred_np)
+        pred_np = award_voting(pred_np, rookie=rookie)
     top_predictions = {}
     # Get the players with highest probability for each team
     for team in range(1, num_teams + 1):
@@ -104,13 +111,13 @@ def prediction_to_dict(prediction, names, mvp, rookie=False, voting=False):
     return prediction_dict
 
 # Function to calculate the score of the model
-def calculate_score(model, validation_set, columns, vote=True):
+def calculate_score(model, validation_set, columns, vote=True, rookie=False):
     score = 0
     for season in validation_set:
         prediction = prediction_to_dict(model.predict_proba(validation_set[season]['data'][columns]), validation_set[season]['names'],
-                                         validation_set[season]['mvp'], voting=vote)
+                                         validation_set[season]['mvp'], voting=vote, rookie=rookie)
         real_nba_teams = validation_set[season]['real_nba_teams']
-        score += award_metrics(prediction, real_nba_teams)
+        score += award_metrics(prediction, real_nba_teams, rookie=rookie)
     return score/4
 
 # Function to randomly select parameters for the models
@@ -423,5 +430,247 @@ def all_nba_training():
     print("Prediction for 2023/24")
     print(predictions_2324)
 
+# Define the training function for the All-Rookie team
+def all_rookie_training():
+    # Load the data
+    seasonal_stats = pd.read_csv('data/seasonal_stats_with_awards.csv')
+    # Filter the data to only include regular season games
+    regular_seasons = seasonal_stats[seasonal_stats['MATCH_TYPE'] == 'Regular']
+
+    def convert_season_to_start_year(season):
+        return int(season[:4])
+
+    regular_seasons['SEASON_START'] = regular_seasons['SEASON'].apply(convert_season_to_start_year)
+    regular_seasons = regular_seasons.loc[regular_seasons['SEASON_START'] >= 1988]
+
+    # Add a column to determine if player was in any of the All-NBA teams
+    regular_seasons['ANY_ALL_NBA'] = regular_seasons['All-NBA-Team'].apply(lambda x: 1 if x > 0 else 0)
+    # Add a column to determine if player was in any of the All-Rookie teams
+    regular_seasons['ANY_ALL_ROOKIE'] = regular_seasons['All-Rookie-Team'].apply(lambda x: 1 if x > 0 else 0)
+
+    fig, axs = plt.subplots(2, 2)
+
+    # Plot data on each subplot
+    axs[0, 0].scatter(regular_seasons.loc[regular_seasons['ANY_ALL_ROOKIE'] == 1, 'PLAYER_NAME'],
+                      regular_seasons.loc[regular_seasons['ANY_ALL_ROOKIE'] == 1, 'GP'])
+    axs[0, 0].set_title('Games Played by All-NBA Rookie Players')
+
+    axs[0, 1].scatter(regular_seasons.loc[regular_seasons['ANY_ALL_ROOKIE'] == 1, 'PLAYER_NAME'],
+                      regular_seasons.loc[regular_seasons['ANY_ALL_ROOKIE'] == 1, 'MIN'])
+    axs[0, 1].set_title('Minutes Played by All-NBA Rookie Players')
+
+    axs[1, 0].scatter(regular_seasons.loc[regular_seasons['ANY_ALL_ROOKIE'] == 1, 'PLAYER_NAME'],
+                      regular_seasons.loc[regular_seasons['ANY_ALL_ROOKIE'] == 1, 'PTS'])
+    axs[1, 0].set_title('Points Scored by All-NBA Rookie Players')
+
+    axs[1, 1].scatter(regular_seasons.loc[regular_seasons['ANY_ALL_ROOKIE'] == 1, 'PLAYER_NAME'],
+                      regular_seasons.loc[regular_seasons['ANY_ALL_ROOKIE'] == 1, 'FP'])
+    axs[1, 1].set_title('Fantasy Points by All-NBA Rookie Players')
+
+    # Display the plot
+    plt.tight_layout()
+    plt.show()
+
+    # After plotting, we can see that there can be added some filters to the data
+    rookies = regular_seasons.loc[regular_seasons['ROOKIE_SEASON'] == 1]
+    regular_seasons_len = len(rookies)
+    rookies = rookies.loc[rookies['GP'] >= 24]
+    rookies = rookies.loc[rookies['MIN'] >= 650]
+    rookies = rookies.loc[rookies['PTS'] >= 250]
+    rookies = rookies.loc[rookies['FP'] >= 500]
+    regular_seasons_len_after = len(rookies)
+    print(f'Number of rows before filtering: {regular_seasons_len} and after filtering: {regular_seasons_len_after}')
+
+    # Calculate per game statistics
+    rookies['MIN_per_GP'] = rookies['MIN'] / rookies['GP']
+    rookies['PTS_per_GP'] = rookies['PTS'] / rookies['GP']
+    rookies['REB_per_GP'] = rookies['REB'] / rookies['GP']
+    rookies['AST_per_GP'] = rookies['AST'] / rookies['GP']
+    rookies['STL_per_GP'] = rookies['STL'] / rookies['GP']
+    rookies['BLK_per_GP'] = rookies['BLK'] / rookies['GP']
+    rookies['TO_per_GP'] = rookies['TO'] / rookies['GP']
+    rookies['FP_per_GP'] = rookies['FP'] / rookies['GP']
+    rookies['PIE_per_GP'] = rookies['PIE'] / rookies['GP']
+    rookies['FGM_per_GP'] = rookies['FGM'] / rookies['GP']
+    rookies['FGA_per_GP'] = rookies['FGA'] / rookies['GP']
+    rookies['FG3M_per_GP'] = rookies['FG3M'] / rookies['GP']
+    rookies['FG3A_per_GP'] = rookies['FG3A'] / rookies['GP']
+    rookies['FTM_per_GP'] = rookies['FTM'] / rookies['GP']
+    rookies['FTA_per_GP'] = rookies['FTA'] / rookies['GP']
+
+    # Impute missing values for 3PT percentage
+    rookies['FG3_PCT'] = rookies['FG3_PCT'].fillna(0)
+
+    # Players from the 2023-24 season
+    rookies_2324 = rookies.loc[rookies['SEASON_START'] == 2023]
+    rookies = rookies.loc[rookies['SEASON_START'] < 2023]
+    print(f'Number of players that possibly can be in All-Rookie Team for 2023-24: {len(rookies_2324)}')
+
+    # Normalize the data for each season
+    seasons = rookies['SEASON_START'].unique()
+    seasons_max = rookies.groupby('SEASON_START').max()
+    normalize_columns = ['MIN_per_GP', 'PTS_per_GP', 'REB_per_GP', 'AST_per_GP', 'STL_per_GP', 'BLK_per_GP',
+                         'TO_per_GP', 'FP_per_GP', 'PIE_per_GP', 'FGM_per_GP', 'FGA_per_GP', 'FG3M_per_GP',
+                         'FG3A_per_GP', 'FTM_per_GP', 'FTA_per_GP', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'TO', 'FP',
+                         'PIE', 'FGM', 'FGA', 'FG3M', 'FG3A', 'FTM', 'FTA', 'MIN', 'GP', 'W']
+    normalized_seasons = rookies.copy()
+    for season in seasons:
+        for column in normalize_columns:
+            normalized_seasons.loc[normalized_seasons['SEASON_START'] == season, column] /= seasons_max.loc[season, column]
+
+    # Correlation of awards and All-NBA team selection
+    awards = ['MVP', 'DPOY', 'ROY', '6MOY', 'MIP', 'All-Star', 'All-Star-MVP', 'POTW', 'POTM', 'ROTM']
+    for award in awards:
+        print(award)
+        print(normalized_seasons['All-Rookie-Team'].loc[normalized_seasons[award] > 0].value_counts())
+
+    # Normalize the data for the 2023-24 season
+    normalized_season2324 = rookies_2324.copy()
+    max2324 = rookies_2324.max()
+    for column in normalize_columns:
+        normalized_season2324[column] /= max2324[column]
+
+    # Create correlation matrix
+    corr_features = ['W', 'MIN_per_GP', 'PTS_per_GP', 'REB_per_GP', 'AST_per_GP', 'STL_per_GP', 'BLK_per_GP',
+                     'FP_per_GP', 'PIE_per_GP', 'FG_PCT', 'FT_PCT', 'FG3_PCT', 'FGM_per_GP', 'FTM_per_GP',
+                     'FG3M_per_GP', 'DD', 'TD', 'All-Rookie-Team', 'ANY_ALL_ROOKIE']
+    correlation_matrix = normalized_seasons[corr_features].corr()
+    sns.heatmap(correlation_matrix, annot=True)
+    plt.show()
+
+    # Divide the data into training and validation sets
+    np.random.seed(42)
+    val_seasons = np.random.randint(1988, 2023, 4)
+    X_train = normalized_seasons.loc[~normalized_seasons['SEASON_START'].isin(val_seasons)]
+    X_val = normalized_seasons.loc[normalized_seasons['SEASON_START'].isin(val_seasons)]
+    y_train = X_train['All-Rookie-Team']
+
+    # Drop unnecessary columns
+    columns_to_drop = ['SEASON', 'SEASON_START', 'MATCH_TYPE', 'All-NBA-Team', 'ANY_ALL_NBA', 'PLAYER_NAME',
+                        'ANY_ALL_ROOKIE', 'All-Defensive-Team', 'All-Rookie-Team', 'Finals-MVP', 'PLAYER_ID',
+                       'MVP', 'ROY', '6MOY', 'MIP', 'ROOKIE_SEASON', 'FTM', 'FGM', 'FG3M']
+
+    X_train = X_train.drop(columns_to_drop, axis=1)
+
+    # Create validation set
+    validation_set = {}
+
+    for season in val_seasons:
+        validation_set[season] = {}
+        season_data = X_val.loc[X_val['SEASON_START'] == season]
+        # Save the names of the players
+        validation_set[season]['names'] = season_data['PLAYER_NAME'].to_numpy()
+        # Save the real All-NBA teams and MVP
+        validation_set[season]['real_nba_teams'] = {"first rookie all-nba team": season_data['PLAYER_NAME'][season_data['All-Rookie-Team'] == 1].values,
+                                                    "second rookie all-nba team": season_data['PLAYER_NAME'][season_data['All-Rookie-Team'] == 2].values}
+        validation_set[season]['mvp'] = season_data['PLAYER_NAME'][season_data['ROY'] == 1].values[0]
+        # Drop unnecessary columns and save the data
+        season_data = season_data.drop(columns_to_drop, axis=1)
+        validation_set[season]['data'] = season_data
+
+    # Create a dataframe to store the scores of the models
+    model_scores = pd.DataFrame(columns=['model_name', 'param', 'used_statistics', 'vote', 'score'])
+
+    # Define the voting weights
+    voting_weights = [[1, 1, 1], [1, 2, 1], [1, 1, 2],
+                    [2, 1, 1], [2, 2, 1], [1, 2, 2]]
+    # Get available columns
+    columns = X_train.columns
+
+    # Create a loop to test different configuarations of the models and data
+    for i in range(50):
+        # Randomly select columns to use
+        columns_to_use = np.random.choice(columns, size=np.random.randint(5, len(columns)), replace=False)
+
+        # Create a loop to test different models with different parameters
+        for j in range(50):
+            print(f'Iteration: {i}/{j}')
+            # Randomize the parameters
+            randomized_params = randomize_parameters()
+            # Define the models
+            models = define_models(randomized_params, voting_weights)
+            # Train the models
+            for model_name, model in models.items():
+                model.fit(X_train[columns_to_use], y_train)
+                score_vote = calculate_score(model, validation_set, columns_to_use, vote=True, rookie=True)
+                score_no_vote = calculate_score(model, validation_set, columns_to_use, vote=False, rookie=True)
+                if score_vote>score_no_vote:
+                    score = score_vote
+                    vote = True
+                else:
+                    score = score_no_vote
+                    vote = False
+                new_row = pd.DataFrame({'model_name': [model_name],
+                                        'param': [randomized_params[model_name]],
+                                        'used_statistics': [columns_to_use],
+                                        'score': [score],
+                                        'vote': [vote]})
+                model_scores = pd.concat([model_scores, new_row], ignore_index=True)
+        # Save the statistics of the models as a csv file
+        model_scores.to_csv('./models/model_scores_rookie.csv')
+
+    # Select the best model
+    best_model = model_scores.loc[model_scores['score'].idxmax()]
+    print(best_model)
+
+    # Create the best predictor
+    if best_model['model_name'] == 'Voting':
+        best_predictor = VotingClassifier([('RFC', RandomForestClassifier(n_estimators=best_model['param']['RFC']['n_estimators'],
+                                        max_depth=best_model['param']['RFC']['max_depth'],
+                                        min_samples_split=best_model['param']['RFC']['min_samples_split'],
+                                        min_samples_leaf=best_model['param']['RFC']['min_samples_leaf'],
+                                        max_features=best_model['param']['RFC']['max_features'],
+                                        random_state=42)),
+                                          ('XGB', xgb.XGBClassifier(n_estimators=best_model['param']['XGB']['n_estimators'],
+                                        max_depth=best_model['param']['XGB']['max_depth'],
+                                        learning_rate=best_model['param']['XGB']['learning_rate'],
+                                        subsample=best_model['param']['XGB']['subsample'],
+                                        colsample_bytree=best_model['param']['XGB']['colsample_bytree'],
+                                        random_state=42)),
+                                          ('LGB', lgb.LGBMClassifier(n_estimators=best_model['param']['LGB']['n_estimators'],
+                                        max_depth=best_model['param']['LGB']['max_depth'],
+                                        learning_rate=best_model['param']['LGB']['learning_rate'],
+                                        subsample=best_model['param']['LGB']['subsample'],
+                                        colsample_bytree=best_model['param']['LGB']['colsample_bytree'],
+                                        random_state=42))],
+                                        voting='soft',
+                                        weights=voting_weights[best_model['param']['Voting']['weights_nr']])
+    elif best_model['model_name'] == 'RFC':
+        best_predictor = RandomForestClassifier(n_estimators=best_model['param']['n_estimators'],
+                                        max_depth=best_model['param']['max_depth'],
+                                        min_samples_split=best_model['param']['min_samples_split'],
+                                        min_samples_leaf=best_model['param']['min_samples_leaf'],
+                                        max_features=best_model['param']['max_features'],
+                                        random_state=42)
+    elif best_model['model_name'] == 'XGB':
+        best_predictor = xgb.XGBClassifier(n_estimators=best_model['param']['n_estimators'],
+                                        max_depth=best_model['param']['max_depth'],
+                                        learning_rate=best_model['param']['learning_rate'],
+                                        subsample=best_model['param']['subsample'],
+                                        colsample_bytree=best_model['param']['colsample_bytree'],
+                                        random_state=42)
+    elif best_model['model_name'] == 'LGB':
+        best_predictor = lgb.LGBMClassifier(n_estimators=best_model['param']['n_estimators'],
+                                        max_depth=best_model['param']['max_depth'],
+                                        learning_rate=best_model['param']['learning_rate'],
+                                        subsample=best_model['param']['subsample'],
+                                        colsample_bytree=best_model['param']['colsample_bytree'],
+                                        random_state=42)
+
+    # Train the best model
+    best_predictor.fit(X_train[best_model['used_statistics']], y_train)
+
+    # Save the model
+    with open('./models/all_rookie_pred_model.pkl', 'wb') as f:
+        pickle.dump(best_predictor, f)
+
+    # Predict the All-Rookie teams for the 2023-24 season
+    names_2324 = normalized_season2324['PLAYER_NAME'].to_numpy()
+    mvp_2324 = normalized_season2324['PLAYER_NAME'][normalized_season2324['ROY'] == 1].values[0]
+    predictions_2324 = prediction_to_dict(best_predictor.predict_proba(normalized_season2324[best_model['used_statistics']]), names_2324, mvp_2324, voting=True, rookie=True)
+    print("Prediction for 2023/24")
+    print(predictions_2324)
+
 if __name__ == '__main__':
-    all_nba_training()
+    #all_nba_training()
+    all_rookie_training()

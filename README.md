@@ -118,6 +118,26 @@ The correlation between the awards and the selection to All-NBA teams since 1988
 
 The data shows that the MVPs are always selected to 1st All-NBA team, All-Star Game MVPs are usually selected to 1st All-NBA team or 2nd All-NBA team. DPOYs, All-Star Game Players, POTWs and POTMs have high chance to be selected to All-NBA teams.
 
+#### 2.3.2. Awards and Rookie All-NBA teams
+
+The correlation between the awards and the selection to All-NBA Rookie teams since 1988-89 season was checked and that data is shown in the table below (for ROTM it meant that the player won at least one award during the season):
+
+
+| Award | 1st All-NBA Rookie Team | 2nd All-NBA Rookie Team | Not selected |
+|---------------------|-------------------------|-------------------------|--------------|
+| MVP                 | 0                       | 0                       | 0            |
+| DPOY                | 0                       | 0                       | 0            |
+| ROY                 | 37                      | 0                       | 0            |
+| 6MOY                | 1                       | 0                       | 0            |
+| MIP                 | 0                       | 0                       | 0            |
+| All-Star Game Player | 7                       | 0                       | 0            |
+| All-Star Game MVP   | 0                       | 0                       | 0            |
+| POTW                | 24                      | 0                       | 0            |
+| POTM                | 0                       | 0                       | 0            |
+| ROTM                | 111                     | 28                      | 23           |
+
+In the data in the table we can see that most of the awards weren't won by players who were selected to any of the All-NBA Team. However all Rookie Of The Year winners were selected to 1st All-NBA Rookie Team. Winning Rookie Of The Month also means a player has high chance of being selected to the All-NBA Rookie Teams. Unfortunately in the data there were no Rising-Star matches that take place during All-Star Weekends as this could have impact.
+
 ### 2.4. Average statistics and normalization
 
 The statistics were averaged for each player to get his average impact on the game per match (by doing so the number of games player played doesn't matter). 
@@ -139,6 +159,16 @@ By doing so, the data for seasons 1988-89 till 2023-23 was reduced from 16711 to
 
 ### 2.4.2. Eliminating players with low statistics for Rookie All-NBA teams prediction
 
+Firstly all non Rookie players were removed from the dataset. After that the same statistics were chosen and displayed as for All-NBA teams. The filters for Rookie players were applied as follows:
+- `Games Played` >= 24,
+- `Minutes` played during season >= 650,
+- `Points` scored during season >= 250,
+- `Fantasy Points` scored during season >= 500.
+
+![Statistics of Rookie players through years](/media/4_All_NBA_Rookie_players_through_years_stats.png)
+
+The filters allowed to reduce the data from 2801 players to just 917. Also only 25 players were eligible to be selected to All-NBA Rookie Teams in 2023-24 season.
+
 ### 2.4.3. Statistics correlation for All-NBA teams prediction
 
 After normalizing the data, the correlation between the normalized statistics and the selection to All-NBA teams was checked. The correlation matrix is shown below:
@@ -156,10 +186,34 @@ High correlation between those above statistics and being selected to All-NBA te
 
 The least correlated statistics are:
 - `Free Throw Percentage`,
-- `3PT Field Goals Percentage`,
+- `3PT Field Goal Percentage`,
 - `3 PT Field Goals Made`.
 
 The low correlation between 3PT Shot statistics is probably caused by the fact that the Centers and Power Forwards usually don't shoot 3PT shots. And in the past those kind of players also weren't good in Free Throws what explains the low correlation with Free Throw Percentage.
+
+### 2.4.4. Statistics correlation for All-NBA Rookie teams prediction
+
+After normalizing the data for Rookie players, the correlation between the normalized statistics and the selection to All-NBA Rookie teams was checked. The correlation matrix is shown below:
+
+![Correlation matrix for All-NBA Rookie teams prediction](/media/5_All_NBA_Rookie_players_normalized_stats_correlation.png)
+
+The most correlated statistics with being selected to All-NBA Rookie teams are:
+- `Field Goals Made`,
+- `Fantasy Points`,
+- `Points`,
+- `Player Impact Estimate`,
+- `Minutes`.
+
+Most of the statistics are the same as for All-NBA teams prediction. The fact that `Minutes` is highly correlated with being selected to All-NBA Rookie teams may be caused by the fact that most Rookies aren't starters and they don't play as much as the experienced players (so only really good rookies play a lot of time).
+
+The least correlated statistics are:
+- `3PT Field Goal Percentage`,
+- `Free Throw Percentage`,
+- `Wins`,
+- `Field Goal Percentage`,
+- `Triple Doubles`.
+
+The low correlation between `Wins` and being selected to All-NBA Rookie teams is understandable because the best rookies usually play in the teams from bottom of the table (because the worst teams get first picks in the draft). The low correlation between `Triple Doubles` and being selected to All-NBA Rookie teams is probably caused by the fact that achieving a Triple-Double is difficult even for experienced players and rookies usually spend less time on the court, so it's even harder to get any (so most of them don't achieve even one).
 
 ## 3. Splitting the data for training and validation sets
 
@@ -194,11 +248,11 @@ The baseline model was a Random Forest Classifier with `n_estimators = 100` that
 
 The baseline model got a high score so it's a good starting point, but also makes it harder to find early improvements.
 
-#### 5.1.2. Random Forest Classifier with only per game statistics (score: 141.5)
+#### 5.1.2. Random Forest Classifier with only per game statistics (score: 141.50)
 
 After removing the statistics that weren't calculated as mean per game, the score of the model decreased to 141.5.
 
-#### 5.1.3. Random Forest Classifier with prediction voting (score: 154.5)
+#### 5.1.3. Random Forest Classifier with prediction voting (score: 154.50)
 
 The model was predicting the probability of player being selected to each of the All-NBA teams and than the predictions were used to calculate voting points from the formula:
 
@@ -259,6 +313,26 @@ The best results for each model are shown in the table below:
 Before 2023/2024 season, each of the All-NBA teams was containing 2 guards, 2 forwards and 1 center (since 2023/24 the voting is positionless). With that in mind the model could be improved by adding information about the position of the player and then filtering the predictions to have correct number of players in each position.
 
 ### 5.2. Rookie All-NBA teams prediction
+
+#### 5.2.1. Baseline model (score: 131.25)
+
+Random Forest Classifier with `n_estimators = 100` was used as a baseline model. The score on the validation set (with all features) was 131.25 (out of 180). 
+
+#### 5.2.2. Random Forest Classifier with voting (score: 136.50)
+
+Similar to the model for All-NBA teams, the probability voting was added. The formula for voting was changed to:
+
+$VotPts = 2 \cdot P_{1st Team} + 1 \cdot P_{2nd Team}$
+
+After adding the voting, the score for the model increased to 136.5.
+
+#### 5.2.3. Best model for predicting All-NBA teams (score: 126.00)
+
+Using the model that was best for predicting All-NBA teams and the same features, resulted in a score of 126.00 with additional voting and 115.50 without it.
+
+#### 5.2.4. Hyperparameter tuning and feature selection (score: XXX)
+
+
 
 ## 6. Predictions for 2023/2024 season
 
