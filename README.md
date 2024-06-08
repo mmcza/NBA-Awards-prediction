@@ -13,20 +13,32 @@
     * [2.2. Player statistics](#22-player-statistics)
     * [2.3. Awards](#23-awards)
       * [2.3.1. Awards and All-NBA teams](#231-awards-and-all-nba-teams)
+      * [2.3.2. Awards and Rookie All-NBA teams](#232-awards-and-rookie-all-nba-teams)
     * [2.4. Average statistics and normalization](#24-average-statistics-and-normalization)
     * [2.4.1. Eliminating players with low statistics for All-NBA teams prediction](#241-eliminating-players-with-low-statistics-for-all-nba-teams-prediction)
     * [2.4.2. Eliminating players with low statistics for Rookie All-NBA teams prediction](#242-eliminating-players-with-low-statistics-for-rookie-all-nba-teams-prediction)
     * [2.4.3. Statistics correlation for All-NBA teams prediction](#243-statistics-correlation-for-all-nba-teams-prediction)
+    * [2.4.4. Statistics correlation for All-NBA Rookie teams prediction](#244-statistics-correlation-for-all-nba-rookie-teams-prediction)
   * [3. Splitting the data for training and validation sets](#3-splitting-the-data-for-training-and-validation-sets)
   * [4. Metric](#4-metric)
   * [5. Models](#5-models)
     * [5.1. All-NBA teams prediction](#51-all-nba-teams-prediction)
       * [5.1.1. Baseline model (score: 148.25)](#511-baseline-model-score-14825)
-      * [5.1.2. Random Forest Classifier with only per game statistics (score: 141.5)](#512-random-forest-classifier-with-only-per-game-statistics-score-1415)
-      * [5.1.3. Random Forest Classifier with prediction voting (score: 154.5)](#513-random-forest-classifier-with-prediction-voting-score-1545)
-      * [5.1.4. Comparison of different default models (Logistic Regression, Support Vector Machine, Decision Tree, Random Forest, K-Nearest Neighbors, XGBOOST, LightGBM, Voting Classifier)](#514-comparison-of-different-default-models-logistic-regression-support-vector-machine-decision-tree-random-forest-k-nearest-neighbors-xgboost-lightgbm-voting-classifier)
-      * [5.1.5. Hyperparameter tuning and feature selection](#515-hyperparameter-tuning-and-feature-selection)
+      * [5.1.2. Random Forest Classifier with only per game statistics (score: 141.50)](#512-random-forest-classifier-with-only-per-game-statistics-score-14150)
+      * [5.1.3. Random Forest Classifier with prediction voting (score: 154.50)](#513-random-forest-classifier-with-prediction-voting-score-15450)
+      * [5.1.4. Comparison of different default models - Logistic Regression, Support Vector Machine, Decision Tree, Random Forest, K-Nearest Neighbors, XGBOOST, LightGBM, Voting Classifier (score: 158.75)](#514-comparison-of-different-default-models---logistic-regression-support-vector-machine-decision-tree-random-forest-k-nearest-neighbors-xgboost-lightgbm-voting-classifier-score-15875)
+      * [5.1.5. Hyperparameter tuning and feature selection (score 175.75)](#515-hyperparameter-tuning-and-feature-selection-score-17575)
+      * [5.1.6. How predictions for validation set could be improved](#516-how-predictions-for-validation-set-could-be-improved)
     * [5.2. Rookie All-NBA teams prediction](#52-rookie-all-nba-teams-prediction)
+      * [5.2.1. Baseline model (score: 131.25)](#521-baseline-model-score-13125)
+      * [5.2.2. Random Forest Classifier with voting (score: 136.50)](#522-random-forest-classifier-with-voting-score-13650)
+      * [5.2.3. Best model for predicting All-NBA teams (score: 126.00)](#523-best-model-for-predicting-all-nba-teams-score-12600)
+      * [5.2.4. Hyperparameter tuning and feature selection (score: 174.50)](#524-hyperparameter-tuning-and-feature-selection-score-17450)
+  * [6. Predictions for 2023/2024 season](#6-predictions-for-20232024-season)
+    * [6.1. All-NBA teams](#61-all-nba-teams)
+    * [6.2. Rookie All-NBA teams](#62-rookie-all-nba-teams)
+  * [7. Summary](#7-summary)
+  * [8. Possible improvements](#8-possible-improvements)
 <!-- TOC -->
 
 ## Requirements
@@ -330,15 +342,30 @@ After adding the voting, the score for the model increased to 136.5.
 
 Using the model that was best for predicting All-NBA teams and the same features, resulted in a score of 126.00 with additional voting and 115.50 without it.
 
-#### 5.2.4. Hyperparameter tuning and feature selection (score: XXX)
+#### 5.2.4. Hyperparameter tuning and feature selection (score: 174.50)
 
+The same parameter grid was used as for All-NBA teams prediction. Once again the parameters were randomly chosen 50 times for each of 50 randomly chosen sets of features. The best score (174.5) was achieved by 3 models:
 
+- XGBoost:
+  - model parameters: `{'n_estimators': 400, 'max_depth': 25, 'learning_rate': 0.1, 'subsample': 0.8, 'colsample_bytree': 0.5, 'gamma': 0.0}`,
+  - features: `['All-Star-MVP' 'FG3_PCT' 'W' 'REB_per_GP' 'POTW' 'FP_per_GP' 'FGM_2' 'STL_per_GP' 'STL' 'TD' 'FG_PCT' 'REB' 'FG3A' 'ROTM' 'FGA' 'FGA_per_GP' 'FTM_2' 'PTS' 'FP' 'AST_per_GP' 'DD' 'POTM' 'MIN' 'AST' 'FG3M_per_GP' 'TO_per_GP' 'All-Star' 'PIE' 'PTS_per_GP' 'L' 'BLK_per_GP' 'PIE_per_GP' 'FTA_per_GP']`,
+  - additional voting: `True`,
+- LightGBM:
+  - model parameters: `{'n_estimators': 300, 'max_depth': 10, 'learning_rate': 0.01, 'subsample': 0.6, 'colsample_bytree': 0.8}`,
+  - features: `['All-Star-MVP' 'POTW' 'W' 'ROTM' 'FG3A' 'STL' 'REB' 'PIE' 'REB_per_GP' 'TO_per_GP' 'FG3M_2' 'PTS' 'STL_per_GP' 'FP_per_GP' 'L' 'FP' 'MIN' 'MIN_per_GP' 'FG3A_per_GP' 'PIE_per_GP' 'FTM_per_GP' 'FGA_per_GP' 'FG3M_per_GP' 'POTM' 'GP' 'FG3_PCT']`,
+  - additional voting: `True`,
+- LightGBM:
+  - model parameters: `{'n_estimators': 100, 'max_depth': None, 'learning_rate': 0.05, 'subsample': 0.8, 'colsample_bytree': 1.0}`,
+  - features: `['All-Star-MVP' 'POTW' 'W' 'ROTM' 'FG3A' 'STL' 'REB' 'PIE' 'REB_per_GP' 'TO_per_GP' 'FG3M_2' 'PTS' 'STL_per_GP' 'FP_per_GP' 'L' 'FP' 'MIN' 'MIN_per_GP' 'FG3A_per_GP' 'PIE_per_GP' 'FTM_per_GP' 'FGA_per_GP' 'FG3M_per_GP' 'POTM' 'GP' 'FG3_PCT']`,
+  - additional voting: `True`.
+
+The XGBoost was chosen because it was the first model with the highest score.
 
 ## 6. Predictions for 2023/2024 season
 
 ### 6.1. All-NBA teams
 
-Predictions for the 2023/2024 season are based on the best model from the previous section. The predictions are shown in the table below:
+Predictions for the 2023/2024 season are based on the best model from section 5.1.5. The predictions are shown in the table below:
 
 | 1st Team | 2nd Team | 3rd Team |
 |----------|----------|----------|
@@ -349,3 +376,36 @@ Predictions for the 2023/2024 season are based on the best model from the previo
 | Jayson Tatum | LeBron James | Tyrese Haliburton |
 
 ### 6.2. Rookie All-NBA teams
+
+Predictions for the 2023/2024 season are based on the best model from section 5.2.4. The predictions are shown in the table below:
+
+| 1st Team | 2nd Team |
+|----------|----------|
+| Victor Wembanyama | Scoot Henderson |
+| Chet Holmgren | Keyonte George |
+| Brandon Miller | Amen Thompson |
+| Jaime Jaquez Jr. | Dereck Lively II |
+| Brandin Podziemski | GG Jackson |
+
+## 7. Summary
+
+The final score on the 2023-24 season was 356 points (out of 450):
+- All-NBA Teams:
+  - 1st Team: 10+10+10+10+10+40 = 90,
+  - 2nd Team: 10+10+10+10+8+20 = 68,
+  - 3rd Team: 10+10+0+8+10+10 = 48,
+- All-NBA Rookie Teams:
+  - 1st Team: 10+10+10+10+10+40 = 90,
+  - 2nd Team: 0+10+10+10+10+20 = 60.
+
+The models correctly predicted 21 out of 25 players, 2 players were in wrong teams (difference of 1 team) and 2 players were missing.
+
+As mentioned in section 5.1.6., before 2023/24 season the players were chosen to All-NBA Teams based on their position what could be added to the model to predict on validation set but not on the 2023-24 season (that doesn't apply to All-NBA Rookie Teams as they were always positionless). That also creates that the data wasn't perfect for training.
+
+## 8. Possible improvements
+
+Apart from adding the information about the positions of the players, the following improvements could be implemented:
+- age/number of seasons in NBA of the player,
+- draft pick number,
+- use the whole dataset since 1946-47 season (the problem is that before 1988-89 only 2 All-NBA teams were selected),
+- create even bigger parameter grid and test more combinations.
