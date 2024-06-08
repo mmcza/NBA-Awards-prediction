@@ -314,11 +314,9 @@ By randomly choosing the features 50 times and then randomly choosing parameters
 - model: `Random Forest Classifier`,
 - model parameters: `{'n_estimators': 200, 'max_depth': 10, 'min_samples_split': 2, 'min_samples_leaf': 2, 'max_features': 'sqrt'}`,
 - features: `['STL', 'FTM_2', 'STL_per_GP', 'PIE_per_GP', 'FTA', 'FG3M_per_GP', 'POTM', 'All-Star', 'MIN', 'FGM_2', 'FP', 'DD', 'GP', 'FTA_per_GP', 'PTS', 'REB', 'DPOY', 'FT_PCT', 'REB_per_GP', 'All-Star-MVP', 'L', 'TD', 'FG3_PCT', 'BLK_per_GP', 'PTS_per_GP', 'AST', 'PIE', 'W', 'FG3M_2', 'TO_per_GP', 'FGM_per_GP', 'FGA', 'FTM_per_GP', 'ROTM']`,
-- additional voting: `False`.
+- additional voting: `True`.
 
-The best results for each model are shown in the table below:
-
-3 best sets of features (mean value for all models):
+All the models with their parameters and features were saved to a [csv file](/models/model_scores.csv).
 
 #### 5.1.6. How predictions for validation set could be improved
 
@@ -359,7 +357,7 @@ The same parameter grid was used as for All-NBA teams prediction. Once again the
   - features: `['All-Star-MVP' 'POTW' 'W' 'ROTM' 'FG3A' 'STL' 'REB' 'PIE' 'REB_per_GP' 'TO_per_GP' 'FG3M_2' 'PTS' 'STL_per_GP' 'FP_per_GP' 'L' 'FP' 'MIN' 'MIN_per_GP' 'FG3A_per_GP' 'PIE_per_GP' 'FTM_per_GP' 'FGA_per_GP' 'FG3M_per_GP' 'POTM' 'GP' 'FG3_PCT']`,
   - additional voting: `True`.
 
-The XGBoost was chosen because it was the first model with the highest score.
+The XGBoost was chosen because it was the first model with the highest score. All the models with their parameters, used features and score were saved to a [csv file](/models/model_scores_rookie.csv).
 
 ## 6. Predictions for 2023/2024 season
 
